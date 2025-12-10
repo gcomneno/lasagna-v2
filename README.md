@@ -86,15 +86,15 @@ La installazione in modalità editable ti dà:
 
 ## Quickstart
 
-### 1. Codificare una serie (CSV → LSG2)
+### 1. Esempio `trend` (CSV → LSG2 → CSV)
 
-Esempio con un trend semplice (dati fittizi):
+Encode (trend quasi perfettamente lossless):
 
 ```bash
-lasagna2 encode   data/examples/trend.csv   data/tmp/trend.lsg2   --dt 60   --t0 2025-01-01T00:00:00Z   --unit kW   --segment-mode adaptive   --min-segment-length 30   --max-segment-length 80   --mse-threshold 0.01   --predictor auto   --residual-coding varint   -v
+lasagna2 encode   --dt 1   --t0 0   --unit step   data/examples/trend.csv   data/tmp/trend.lsg2
 ```
 
-### 2. Ispezionare il file `.lsg2`
+Ispeziona il file `.lsg2`:
 
 ```bash
 lasagna2 info data/tmp/trend.lsg2 -v
@@ -118,13 +118,32 @@ Segments overview:
     2     160   199   40 linear trend  1   17.950001    0.100000       1e-06
 ```
 
-### 3. Decodificare (LSG2 → CSV)
+Decode:
 
 ```bash
-lasagna2 decode data/tmp/trend.lsg2 data/tmp/trend_decoded.csv
+lasagna2 decode   data/tmp/trend.lsg2   data/tmp/trend_decoded.csv
 ```
 
-Il file CSV risultante contiene i valori ricostruiti, uno per riga.
+Il file CSV risultante contiene l’header `# value` e 200 valori ricostruiti, uno per riga.
+
+---
+
+### 2. Esempio `sine_noise` (codec lossy controllato)
+
+Encode (sinusoide + rumore, con soglia MSE più alta):
+
+```bash
+lasagna2 encode   --dt 1   --t0 0   --unit step   data/examples/sine_noise.csv   data/tmp/sine_noise.lsg2
+```
+
+Decode:
+
+```bash
+lasagna2 decode   data/tmp/sine_noise.lsg2   data/tmp/sine_noise_decoded.csv
+```
+
+In questo caso il codec è intenzionalmente **lossy**: la serie ricostruita ha la stessa lunghezza e la stessa forma globale,
+ma i valori non coincidono esattamente punto per punto (RMSE moderata).
 
 ---
 
@@ -165,14 +184,12 @@ print(len(decoded.values), decoded.dt, decoded.unit)
 
 ## Struttura del progetto
 
-```text
+```bash
 lasagna-v2/
   lasagna2/
     __init__.py        # API pubblica (TimeSeries, encode_timeseries, decode_timeseries)
-    l2_core.py         # motore del codec (formato .lsg2, segmentazione, predittori, quantizzazione)
-    l2_cli.py          # implementazione CLI
-    core.py            # compat layer -> re-esporta da l2_core
-    cli.py             # compat layer -> re-esporta da l2_cli
+    core.py            # motore del codec (formato .lsg2, segmentazione, predittori, quantizzazione)
+    cli.py             # implementazione CLI
 
   lasagna_mvp.py       # wrapper CLI compatibile: python lasagna_mvp.py ...
 
