@@ -105,6 +105,7 @@ pytest_cache/
 .env
 .env.*
 *.env
+!*.example.env
 
 # Cartella generica per segreti locali (fuori repo)
 secrets/
@@ -137,13 +138,18 @@ known_hosts
 # Dati e artefatti pesanti
 # --------------------------------------------
 
-# Directory dati: di default ignorata
-data/
+# Directory dati: di default ignorata (contenuto)
+data/*
 !data/README.md
 !data/examples/
+!data/tmp/
+
 data/raw/
-data/tmp/
 data/private/
+
+# tmp: solo segnaposto versionato
+data/tmp/*
+!data/tmp/.gitkeep
 
 # CSV e LSG2 in root: ignorati (niente dataset/artefatti in top-level)
 *.csv
