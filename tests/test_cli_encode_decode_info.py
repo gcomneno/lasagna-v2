@@ -1,10 +1,11 @@
 # tests/test_cli_encode_decode_info.py
 from __future__ import annotations
-
-import math
 from pathlib import Path
-
 from lasagna2.cli import main as lasagna_main
+
+import csv
+import subprocess
+import math
 
 
 def _write_csv(path: Path, values) -> None:
@@ -89,3 +90,65 @@ def test_cli_encode_decode_and_info(tmp_path, capsys):
     assert len(dec_values) == len(values)
     e = rmse(values, dec_values)
     assert e < 1e-3
+
+
+def test_cli_export_tags_trend(tmp_path: Path):
+    repo_root = Path(__file__).resolve().parents[1]
+    examples_dir = repo_root / "data" / "examples"
+
+    in_csv = examples_dir / "trend.csv"
+    encoded = tmp_path / "trend.lsg2"
+    tags_csv = tmp_path / "trend_tags.csv"
+
+    # encode prima (parametri come negli altri test/README)
+    result_enc = subprocess.run(
+        [
+            "lasagna2",
+            "encode",
+            "--dt",
+            "1",
+            "--t0",
+            "0",
+            "--unit",
+            "step",
+            str(in_csv),
+            str(encoded),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert result_enc.returncode == 0, result_enc.stderr
+
+    # export-tags
+    result_tags = subprocess.run(
+        [
+            "lasagna2",
+            "export-tags",
+            str(encoded),
+            str(tags_csv),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert result_tags.returncode == 0, result_tags.stderr
+    assert tags_csv.exists()
+
+    # controlla intestazione e almeno una riga
+    with tags_csv.open("r", encoding="utf-8", newline="") as f:
+        reader = csv.reader(f)
+        header = next(reader)
+        assert header == [
+            "seg_id",
+            "start",
+            "end",
+            "len",
+            "pred",
+            "patt",
+            "sal",
+            "energy",
+            "mean",
+            "slope",
+            "Q",
+        ]
+        first_row = next(reader, None)
+        assert first_row is not None

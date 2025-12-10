@@ -1,7 +1,5 @@
-# lasagna/cli.py
 from __future__ import annotations
 
-import argparse
 from collections import Counter
 from pathlib import Path
 from typing import List
@@ -15,8 +13,11 @@ from .core import (
     RESIDUAL_BLOCK_HEADER_STRUCT,
     encode_timeseries,
     decode_timeseries,
+    classify_segment_pattern,
 )
 
+import argparse
+import csv
 import json
 
 
@@ -54,55 +55,6 @@ def save_timeseries_to_csv(ts: TimeSeries, path: Path) -> None:
         f.write("# value\n")
         for v in ts.values:
             f.write(f"{v:.10g}\n")
-
-
-# ---------------------------------------------------------------------------
-# Pattern classification per segmento
-# ---------------------------------------------------------------------------
-def classify_segment_pattern(seg: SegmentEntry) -> tuple[str, int]:
-    """
-    Classifica un segmento in (pattern_type, salience).
-
-    pattern_type ∈ {"flat", "trend", "oscillation", "noisy"}
-    salience ∈ {0, 1, 2}
-    """
-    length = seg.end_idx - seg.start_idx + 1
-    if length <= 0:
-        return "flat", 0
-
-    a_slope = abs(seg.slope)
-    Q = seg.quant_step_Q
-    predictor_type = seg.predictor_type
-
-    # soglie empiriche MVP (tarabili)
-    SLOPE_FLAT = 0.002
-    SLOPE_TREND = 0.01
-    Q_LOW = 0.05
-    Q_HIGH = 0.3
-
-    # pattern_type
-    if a_slope < SLOPE_FLAT and Q < Q_LOW:
-        # praticamente piatto e poco rumore
-        pattern = "flat"
-    elif predictor_type == 1 and a_slope >= SLOPE_TREND:
-        # retta evidente -> trend
-        pattern = "trend"
-    elif predictor_type in (1, 2) and Q_LOW <= Q <= Q_HIGH:
-        # un po' di struttura + energia media -> oscillazione
-        pattern = "oscillation"
-    else:
-        pattern = "noisy"
-
-    # salience: energia grezza
-    energy = (a_slope * length) + (Q * length)
-    if energy < 1.0:
-        salience = 0
-    elif energy < 5.0:
-        salience = 1
-    else:
-        salience = 2
-
-    return pattern, salience
 
 
 # ---------------------------------------------------------------------------
@@ -300,6 +252,15 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
     p_info.set_defaults(func=cli_info)
 
+    # export-tags
+    p_tags = sub.add_parser(
+        "export-tags",
+        help="export segment tags/metrics from .lsg2 to CSV",
+    )
+    p_tags.add_argument("input", type=str, help="input .lsg2 file")
+    p_tags.add_argument("output", type=str, help="output CSV file with segment tags")
+    p_tags.set_defaults(func=cli_export_tags)
+
     return p
 
 
@@ -371,17 +332,20 @@ def cli_info(args: argparse.Namespace) -> None:
         2: "rw",
     }
 
+    print("Segments overview:")
+    print(
+        "  id  start   end   len  pred  patt  sal   energy      mean        slope       Q"
+    )
+    print(
+        "  --- ------- ----- ---- ----- ----- --- ---------- ----------- ----------- -----------"
+    )
+
     patterns: List[str] = []
     saliences: List[int] = []
     lengths: List[int] = []
     slopes: List[float] = []
     Qs: List[float] = []
-
-    print("Segments overview:")
-    print("  id  start   end   len  pred  patt  sal   mean        slope       Q")
-    print(
-        "  --- ------- ----- ---- ----- ----- --- ----------- ----------- -----------"
-    )
+    energies: List[float] = []
 
     for seg_id, seg in enumerate(segments):
         length = seg.end_idx - seg.start_idx + 1
@@ -390,13 +354,15 @@ def cli_info(args: argparse.Namespace) -> None:
         Qs.append(seg.quant_step_Q)
 
         pred_name = predictor_names.get(seg.predictor_type, f"#{seg.predictor_type}")
-        pattern, sal = classify_segment_pattern(seg)
+        pattern, sal, energy = classify_segment_pattern(seg)
         patterns.append(pattern)
         saliences.append(sal)
+        energies.append(energy)
 
         print(
             f"  {seg_id:3d} {seg.start_idx:7d} {seg.end_idx:5d} {length:4d} "
             f"{pred_name:5s} {pattern:5s}  {sal:d} "
+            f"{energy:10.3f} "
             f"{seg.mean:11.6f} {seg.slope:11.6f} {seg.quant_step_Q:11.6g}"
         )
 
@@ -417,6 +383,67 @@ def cli_info(args: argparse.Namespace) -> None:
             print(
                 f"  salience: min={min(saliences)}, max={max(saliences)}, "
                 f"avg={sum(saliences)/len(saliences):.2f}"
+            )
+        if energies:
+            print(
+                f"  energy  : min={min(energies):.3f}, max={max(energies):.3f}, "
+                f"avg={sum(energies)/len(energies):.3f}"
+            )
+
+
+def cli_export_tags(args: argparse.Namespace) -> None:
+    input_path = Path(args.input)
+    output_path = Path(args.output)
+
+    data = input_path.read_bytes()
+    ctx, n_points, segments, coding_type = read_lsg2_metadata_and_segments(data)
+
+    predictor_names = {
+        0: "mean",
+        1: "linear",
+        2: "rw",
+    }
+
+    with output_path.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(
+            [
+                "seg_id",
+                "start",
+                "end",
+                "len",
+                "pred",
+                "patt",
+                "sal",
+                "energy",
+                "mean",
+                "slope",
+                "Q",
+            ]
+        )
+
+        for seg_id, seg in enumerate(segments):
+            length = seg.end_idx - seg.start_idx + 1
+            pred_name = predictor_names.get(
+                seg.predictor_type, f"#{seg.predictor_type}"
+            )
+            # NB: qui assumiamo che classify_segment_pattern(seg) ritorni (patt, sal, energy)
+            pattern, sal, energy = classify_segment_pattern(seg)
+
+            writer.writerow(
+                [
+                    seg_id,
+                    seg.start_idx,
+                    seg.end_idx,
+                    length,
+                    pred_name,
+                    pattern,
+                    sal,
+                    f"{energy:.6g}",
+                    f"{seg.mean:.6g}",
+                    f"{seg.slope:.6g}",
+                    f"{seg.quant_step_Q:.6g}",
+                ]
             )
 
 

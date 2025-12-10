@@ -31,6 +31,55 @@ class SegmentEntry:
     seed_value: float
 
 
+def classify_segment_pattern(seg: SegmentEntry) -> tuple[str, int, float]:
+    """
+    Classifica un segmento in (pattern_type, salience, energy).
+
+    pattern_type ∈ {"flat", "trend", "oscillation", "noisy"}
+    salience ∈ {0, 1, 2}
+    energy è una misura grezza di "intensità" del segmento.
+    """
+    length = seg.end_idx - seg.start_idx + 1
+    if length <= 0:
+        return "flat", 0, 0.0
+
+    a_slope = abs(seg.slope)
+    Q = seg.quant_step_Q
+    predictor_type = seg.predictor_type
+
+    # soglie empiriche MVP (tarabili)
+    SLOPE_FLAT = 0.002
+    SLOPE_TREND = 0.01
+    Q_LOW = 0.05
+    Q_HIGH = 0.3
+
+    # pattern_type
+    if a_slope < SLOPE_FLAT and Q < Q_LOW:
+        # praticamente piatto e poco rumore
+        pattern = "flat"
+    elif predictor_type == 1 and a_slope >= SLOPE_TREND:
+        # retta evidente -> trend
+        pattern = "trend"
+    elif predictor_type in (1, 2) and Q_LOW <= Q <= Q_HIGH:
+        # un po' di struttura + energia media -> oscillazione
+        pattern = "oscillation"
+    else:
+        pattern = "noisy"
+
+    # energia grezza (slope + rumore, pesati per la durata)
+    energy = (a_slope * length) + (Q * length)
+
+    # salienza discreta
+    if energy < 1.0:
+        salience = 0
+    elif energy < 5.0:
+        salience = 1
+    else:
+        salience = 2
+
+    return pattern, salience, energy
+
+
 # ---------------------------------------------------------------------------
 # Binary format structs
 # ---------------------------------------------------------------------------
