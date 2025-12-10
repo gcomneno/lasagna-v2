@@ -125,3 +125,56 @@ def test_cli_roundtrip_trend(tmp_path: Path):
 
     # Se è lossy, puoi usare una tolleranza numerica, ad es.:
     # pd.testing.assert_frame_equal(orig, dec, atol=1e-9, rtol=1e-9)
+
+
+def test_cli_roundtrip_sine_noise(tmp_path: Path):
+    repo_root = Path(__file__).resolve().parents[1]
+    examples_dir = repo_root / "data" / "examples"
+
+    in_csv = examples_dir / "sine_noise.csv"
+    encoded = tmp_path / "sine_noise.lsg2"
+    out_csv = tmp_path / "sine_noise_decoded.csv"
+
+    result_enc = subprocess.run(
+        [
+            "lasagna2",
+            "encode",
+            "--dt",
+            "1",  # usa gli stessi parametri che usi a mano
+            "--t0",
+            "0",
+            "--unit",
+            "step",
+            str(in_csv),
+            str(encoded),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert result_enc.returncode == 0, result_enc.stderr
+
+    result_dec = subprocess.run(
+        [
+            "lasagna2",
+            "decode",
+            str(encoded),
+            str(out_csv),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert result_dec.returncode == 0, result_dec.stderr
+
+    orig_df = pd.read_csv(in_csv)
+    dec_df = pd.read_csv(out_csv)
+
+    orig = orig_df["# value"].tolist()
+    dec = dec_df["# value"].tolist()
+
+    # stessa lunghezza
+    assert len(orig) == len(dec)
+
+    # codec lossy: controlliamo l'errore medio, non l'uguaglianza esatta
+    e = rmse(orig, dec)
+    # soglia da tarare se serve, ma deve restare “piccola”
+    assert e < 0.3
