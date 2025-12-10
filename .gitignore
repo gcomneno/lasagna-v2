@@ -1,0 +1,177 @@
+###############################################
+# Lasagna v2 – security-first .gitignore
+###############################################
+
+# --------------------------------------------
+# Python artefacts
+# --------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Build / distribuzione
+build/
+dist/
+*.egg-info/
+.eggs/
+*.egg
+
+# Estensioni native (se in futuro compili qualcosa)
+*.so
+*.dll
+*.dylib
+*.pyd
+
+# --------------------------------------------
+# Virtual env & tool local state
+# --------------------------------------------
+.venv/
+venv/
+env/
+.env/
+.python-version
+pip-wheel-metadata/
+pip-cache/
+.ruff_cache/
+.mypy_cache/
+.pytype/
+.pyre/
+hypothesis/
+
+# --------------------------------------------
+# Notebook / tool interattivi
+# --------------------------------------------
+.ipynb_checkpoints/
+.jupyter/
+*.ipynb
+
+# --------------------------------------------
+# IDE / editor / roba locale
+# --------------------------------------------
+.vscode/
+.idea/
+*.iml
+*.sublime-*
+*.code-workspace
+
+# File temporanei editor
+*~
+*.swp
+*.swo
+*.bak
+
+# --------------------------------------------
+# OS cruft
+# --------------------------------------------
+.DS_Store
+.DS_Store?
+Thumbs.db
+desktop.ini
+
+# --------------------------------------------
+# Log, dump, artefatti runtime
+# --------------------------------------------
+logs/
+*.log
+*.out
+*.err
+*.stackdump
+
+# Core dump e simili
+*.core
+*.dmp
+
+# --------------------------------------------
+# Coverage / test report / cache
+# --------------------------------------------
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+pytest_cache/
+.pytest_cache/
+.cache/
+*.prof
+*.profile
+*.pstats
+
+# --------------------------------------------
+# File di configurazione sensibili / segreti
+# (nel repo solo *.example senza valori reali)
+# --------------------------------------------
+
+# Env file
+.env
+.env.*
+*.env
+
+# Cartella generica per segreti locali (fuori repo)
+secrets/
+
+# Chiavi & certificati
+*.pem
+*.key
+*.crt
+*.cer
+*.der
+*.pfx
+*.p12
+*.jks
+*.keystore
+*.kdbx
+
+# SSH (solo se malauguratamente finisse qui dentro)
+.ssh/
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+known_hosts
+
+# ATTENZIONE:
+# NON usiamo pattern tipo "*secret*" perché nascondono troppa roba a caso.
+# Per i segreti veri ci pensa detect-secrets + naming ragionevole.
+
+# --------------------------------------------
+# Dati e artefatti pesanti
+# --------------------------------------------
+
+# Directory dati: di default ignorata
+data/
+!data/README.md
+!data/examples/
+data/raw/
+data/tmp/
+data/private/
+
+# CSV e LSG2 in root: ignorati (niente dataset/artefatti in top-level)
+*.csv
+*.lsg2
+
+# Ma CONSENTI gli esempi espliciti (synthetic, documentativi)
+!data/examples/*.csv
+!data/examples/*.lsg2
+
+# Archivio e compressi vari
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.bz2
+*.xz
+
+# --------------------------------------------
+# Temp / scratch
+# --------------------------------------------
+tmp/
+temp/
+*.tmp
+*.temp
+
+# --------------------------------------------
+# Tooling di sicurezza / pre-commit
+# --------------------------------------------
+
+# Baseline di detect-secrets: vogliamo TRACCIARLA
+!.secrets.baseline

@@ -1,0 +1,15 @@
+# Normalizzazione EOL
+* text=auto
+
+# Python: diff decente
+*.py diff=python
+
+# File binari del codec
+*.lsg2 -text binary
+
+# CSV: li consideriamo testo (se/quando li whitelisti)
+*.csv text
+
+# Non tentare merge "furbi" su file di lock, se li userai
+poetry.lock merge=union
+Pipfile.lock merge=union

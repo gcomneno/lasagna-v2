@@ -1,0 +1,103 @@
+name: Supply chain security
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches:
+      - main
+      - master
+  schedule:
+    - cron: '0 3 * * 1'  # lunedì alle 03:00 UTC
+  workflow_dispatch:
+
+permissions: {}  # default: nessun permesso, li diamo per job
+
+jobs:
+  dependency-review:
+    name: Dependency review (GitHub Advisory)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      pull-requests: read
+
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+        with:
+          disable-telemetry: true
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # checkout pinned SHA
+
+      - name: Dependency review
+        uses: actions/dependency-review-action@3c4e3dcb1aa7874d2c16be7d79418e9b7efd6261 # v4.8.2
+        with:
+          fail-on-severity: moderate
+          # es: deny-licenses, allow-licenses, ecc. se vorrai stringere ancora
+
+  pip-audit:
+    name: pip-audit (Python dependencies)
+    runs-on: ubuntu-latest
+
+    # opzionale: non girare sui PR draft
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+        with:
+          disable-telemetry: true
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: pip-audit (requirements-dev)
+        uses: pypa/gh-action-pip-audit@v1.1.0
+        with:
+          # nel repo hai requirements-dev.txt, quindi:
+          inputs: requirements-dev.txt
+          # volendo: require-hashes: true, vulnerability-service: osv, ecc.
+
+  scorecard:
+    name: OpenSSF Scorecard
+    # lo facciamo girare solo su main, tipico per Scorecard
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      security-events: write
+      id-token: write
+
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+        with:
+          disable-telemetry: true
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          persist-credentials: false
+
+      - name: Run Scorecard analysis
+        uses: ossf/scorecard-action@4eaacf0543bb3f2c246792bd56e8cdeffafb205a # v2.4.3
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          publish_results: true

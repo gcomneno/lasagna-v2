@@ -1,0 +1,31 @@
+[project]
+name = "lasagna-v2"
+version = "0.1.0"
+description = "Brain-inspired time series compressor (Lasagna v2, univariate MVP)"
+authors = [
+  { name = "Giancarlo" }
+]
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+  "black>=24.0.0",
+  "ruff>=0.4.0",
+  "pre-commit>=3.7.0",
+  "detect-secrets>=1.5.0",
+  "pytest>=8.0.0",
+]
+
+[project.scripts]
+lasagna2 = "lasagna2.cli:main"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["lasagna2"]

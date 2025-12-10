@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+# Minimizza i permessi per il job di test
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Harden GitHub Runner
+        uses: step-security/harden-runner@df199fb
+        # v2.13.3, tag verificato
+        with:
+          egress-policy: block
+          disable-telemetry: true
+          disable-sudo-and-containers: true
+          allowed-endpoints: >
+            api.github.com:443,
+            github.com:443,
+            raw.githubusercontent.com:443,
+            objects.githubusercontent.com:443,
+            pypi.org:443,
+            files.pythonhosted.org:443
+
+      - name: Checkout repository
+        uses: actions/checkout@692973e
+        # v4.1.7, tag verificato
+        with:
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@4237552
+        # v5.4.0, tag verificato
+        with:
+          python-version: "3.12"
+          check-latest: true
+
+      - name: Show Python and pip versions
+        run: |
+          python --version
+          python -m pip --version
+
+      - name: Install dev dependencies (editable)
+        run: |
+          set -eux
+          python -m pip install --upgrade pip
+          # preferisci extras da pyproject, fallback a requirements-dev
+          if python -m pip install -e ".[dev]"; then
+            echo "Installed from pyproject extras."
+          elif [ -f requirements-dev.txt ]; then
+            python -m pip install -r requirements-dev.txt
+          else
+            echo "No dev requirements found." >&2
+            exit 1
+          fi
+
+      - name: Lint & static checks (pre-commit)
+        run: |
+          set -eux
+          pre-commit run --all-files --show-diff-on-failure
+
+      - name: Run tests
+        env:
+          PYTHONWARNINGS: default
+        run: |
+          set -eux
+          pytest -vv
