@@ -3,13 +3,11 @@ name: Security
 on:
   pull_request:
     branches: [ main ]
-    types: [opened, synchronize, reopened]
-
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [ main ]
-
   schedule:
-    - cron: "0 2 * * *"
+    - cron: "0 2 * * *"  # ogni notte alle 02:00 UTC
 
 permissions:
   contents: read
@@ -22,71 +20,62 @@ concurrency:
 jobs:
   dependency-review:
     name: Dependency Review (PR)
-    runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
     timeout-minutes: 10
+
+    permissions:
+      contents: read
+      pull-requests: read
 
     steps:
       - name: Harden GitHub Runner
-        uses: step-security/harden-runner@df199fb
+        uses: step-security/harden-runner@df199fb7be9f65074067a9eb93f12bb4c5547cf2
         with:
           egress-policy: block
           disable-telemetry: true
-          disable-sudo-and-containers: true
-          allowed-endpoints: >
-            api.github.com:443,
-            github.com:443,
-            raw.githubusercontent.com:443,
-            objects.githubusercontent.com:443
 
       - name: Checkout repository
-        uses: actions/checkout@692973e
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
         with:
           fetch-depth: 2
 
       - name: Dependency Review
-        uses: actions/dependency-review-action@3c4e3dc
-        # v4.8.2
+        uses: actions/dependency-review-action@3c4e3dcb1aa7874d2c16be7d79418e9b7efd6261
         with:
           fail-on-severity: high
           comment-summary-in-pr: true
-          allow-licenses: Apache-2.0, MIT, BSD-2-Clause, BSD-3-Clause
 
   codeql:
     name: CodeQL (Python)
     runs-on: ubuntu-latest
-    # facoltativo: non farlo girare sui PR dei fork se ti pesa
     timeout-minutes: 30
+
+    permissions:
+      contents: read
+      security-events: write
 
     steps:
       - name: Harden GitHub Runner
-        uses: step-security/harden-runner@df199fb
+        uses: step-security/harden-runner@df199fb7be9f65074067a9eb93f12bb4c5547cf2
         with:
           egress-policy: block
           disable-telemetry: true
-          disable-sudo-and-containers: true
-          allowed-endpoints: >
-            api.github.com:443,
-            github.com:443,
-            raw.githubusercontent.com:443,
-            objects.githubusercontent.com:443,
-            uploads.github.com:443
 
       - name: Checkout repository
-        uses: actions/checkout@692973e
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
         with:
           fetch-depth: 2
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@bffd034
-        # v3.31.7
+        uses: github/codeql-action/init@bffd034ab1518ad839a542b8a7356e13a240e076
         with:
           languages: python
 
       - name: Autobuild
-        uses: github/codeql-action/autobuild@bffd034
+        uses: github/codeql-action/autobuild@bffd034ab1518ad839a542b8a7356e13a240e076
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@bffd034
+        uses: github/codeql-action/analyze@bffd034ab1518ad839a542b8a7356e13a240e076
         with:
           category: "/language:python"
