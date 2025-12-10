@@ -2,7 +2,10 @@
 from __future__ import annotations
 
 import math
+import subprocess
+import pandas as pd
 
+from pathlib import Path
 from lasagna2.core import TimeSeries, encode_timeseries, decode_timeseries
 
 
@@ -71,3 +74,54 @@ def test_roundtrip_sine_noise_adaptive_auto_varint():
     e = rmse(values, decoded.values)
     # ci aspettiamo un RMSE moderato (0.0 < e < 0.3)
     assert e < 0.3
+
+
+def test_cli_roundtrip_trend(tmp_path: Path):
+    repo_root = Path(__file__).resolve().parents[1]
+    examples_dir = repo_root / "data" / "examples"
+
+    in_csv = examples_dir / "trend.csv"
+    encoded = tmp_path / "trend.lsg2"
+    out_csv = tmp_path / "trend_decoded.csv"
+
+    # 1) ENCODE via CLI (usa gli stessi parametri che usi tu a mano)
+    result_enc = subprocess.run(
+        [
+            "lasagna2",
+            "encode",
+            "--dt",
+            "1",
+            "--t0",
+            "0",
+            "--unit",
+            "step",
+            str(in_csv),
+            str(encoded),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert result_enc.returncode == 0, result_enc.stderr
+
+    # 2) DECODE via CLI (senza -o, se non è supportato)
+    result_dec = subprocess.run(
+        [
+            "lasagna2",
+            "decode",
+            str(encoded),
+            str(out_csv),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert result_dec.returncode == 0, result_dec.stderr
+
+    # 3) Confronto CSV original vs decoded
+    orig = pd.read_csv(in_csv)
+    dec = pd.read_csv(out_csv)
+
+    # Se il codec è lossless:
+    pd.testing.assert_frame_equal(orig, dec)
+
+    # Se è lossy, puoi usare una tolleranza numerica, ad es.:
+    # pd.testing.assert_frame_equal(orig, dec, atol=1e-9, rtol=1e-9)

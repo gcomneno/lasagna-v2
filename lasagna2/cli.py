@@ -45,7 +45,13 @@ def load_csv_timeseries(path: Path, dt: float, t0: str, unit: str) -> TimeSeries
 
 
 def save_timeseries_to_csv(ts: TimeSeries, path: Path) -> None:
+    """
+    Salva una TimeSeries univariata in CSV "stile Lasagna":
+    - prima riga: header "# value"
+    - poi un valore per riga.
+    """
     with path.open("w", encoding="utf-8") as f:
+        f.write("# value\n")
         for v in ts.values:
             f.write(f"{v:.10g}\n")
 
