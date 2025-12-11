@@ -74,18 +74,27 @@ def classify_segment_pattern(seg: SegmentEntry) -> tuple[str, int, float]:
     SLOPE_FLAT = 0.002
     SLOPE_TREND = 0.01
     Q_LOW = 0.05
-    Q_HIGH = 0.3
+    Q_OSC_MIN = 0.2  # nuova: abbastanza "energetico" da sembrare oscillazione
+    Q_NOISY_MIN = 0.4  # sopra questo consideriamo davvero "noisy"
 
-    # pattern_type
+    # 1) Flat: praticamente piatto e poco rumore
     if a_slope < SLOPE_FLAT and Q < Q_LOW:
-        # praticamente piatto e poco rumore
         pattern = "flat"
+
+    # 2) Trend: retta evidente, anche se c'è rumore
     elif predictor_type == 1 and a_slope >= SLOPE_TREND:
-        # retta evidente -> trend
         pattern = "trend"
-    elif predictor_type in (1, 2) and Q_LOW <= Q <= Q_HIGH:
-        # un po' di struttura + energia media -> oscillazione
+
+    # 3) Oscillation: slope medio basso, ma Q significativo
+    elif (
+        predictor_type in (1, 2)
+        and a_slope < SLOPE_TREND
+        and Q >= Q_OSC_MIN
+        and Q < Q_NOISY_MIN
+    ):
         pattern = "oscillation"
+
+    # 4) Noisy: tutto il resto, soprattutto Q molto alto
     else:
         pattern = "noisy"
 
@@ -343,6 +352,15 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p_motifs.add_argument("output", type=str, help="output CSV file with motifs")
     p_motifs.set_defaults(func=cli_export_motifs)
 
+    # export-profile
+    p_profile = sub.add_parser(
+        "export-profile",
+        help="export a compact semantic profile to CSV",
+    )
+    p_profile.add_argument("input", type=str, help="input .lsg2 file")
+    p_profile.add_argument("output", type=str, help="output CSV file with profile")
+    p_profile.set_defaults(func=cli_export_profile)
+
     return p
 
 
@@ -594,6 +612,128 @@ def cli_export_motifs(args: argparse.Namespace) -> None:
                     f"{m.total_energy:.6g}",
                 ]
             )
+
+
+def cli_export_profile(args: argparse.Namespace) -> None:
+    input_path = Path(args.input)
+    output_path = Path(args.output)
+
+    data = input_path.read_bytes()
+    ctx, n_points, segments, coding_type = read_lsg2_metadata_and_segments(data)
+
+    # meta base
+    dt = float(ctx.get("sampling", {}).get("dt", 1.0))
+    unit = str(ctx.get("unit", "unknown"))
+    n_segments = len(segments)
+
+    # se non ci sono segmenti, scrivi solo lo scheletro
+    patterns: list[str] = []
+    saliences: list[int] = []
+    lengths: list[int] = []
+    energies: list[float] = []
+
+    for seg in segments:
+        length = seg.end_idx - seg.start_idx + 1
+        lengths.append(length)
+        pattern, sal, energy = classify_segment_pattern(seg)
+        patterns.append(pattern)
+        saliences.append(sal)
+        energies.append(energy)
+
+    total_points = n_points if n_points > 0 else sum(lengths) or 1
+
+    # punti per pattern (non solo numero di segmenti)
+    by_pattern_points: dict[str, int] = {}
+    for seg in segments:
+        length = seg.end_idx - seg.start_idx + 1
+        pattern, _sal, _energy = classify_segment_pattern(seg)
+        by_pattern_points[pattern] = by_pattern_points.get(pattern, 0) + length
+
+    frac_flat = by_pattern_points.get("flat", 0) / total_points
+    frac_trend = by_pattern_points.get("trend", 0) / total_points
+    frac_osc = by_pattern_points.get("oscillation", 0) / total_points
+    frac_noisy = by_pattern_points.get("noisy", 0) / total_points
+
+    # salienza
+    if saliences:
+        sal_min = min(saliences)
+        sal_max = max(saliences)
+        sal_avg = sum(saliences) / len(saliences)
+    else:
+        sal_min = sal_max = sal_avg = 0.0
+
+    # energia
+    if energies:
+        e_min = min(energies)
+        e_max = max(energies)
+        e_avg = sum(energies) / len(energies)
+    else:
+        e_min = e_max = e_avg = 0.0
+
+    # motifs per pattern
+    motifs = extract_motifs(segments)
+    by_pattern_motifs: dict[str, int] = {}
+    for m in motifs:
+        by_pattern_motifs[m.pattern] = by_pattern_motifs.get(m.pattern, 0) + 1
+
+    n_motifs_flat = by_pattern_motifs.get("flat", 0)
+    n_motifs_trend = by_pattern_motifs.get("trend", 0)
+    n_motifs_osc = by_pattern_motifs.get("oscillation", 0)
+    n_motifs_noisy = by_pattern_motifs.get("noisy", 0)
+
+    # scrivi CSV: una riga per file
+    with output_path.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(
+            [
+                "file",
+                "n_points",
+                "dt",
+                "unit",
+                "n_segments",
+                # pattern fractions
+                "frac_flat",
+                "frac_trend",
+                "frac_oscillation",
+                "frac_noisy",
+                # salience
+                "sal_min",
+                "sal_max",
+                "sal_avg",
+                # energy
+                "energy_min",
+                "energy_max",
+                "energy_avg",
+                # motifs
+                "n_motifs_flat",
+                "n_motifs_trend",
+                "n_motifs_oscillation",
+                "n_motifs_noisy",
+            ]
+        )
+        writer.writerow(
+            [
+                input_path.name,
+                n_points,
+                f"{dt:g}",
+                unit,
+                n_segments,
+                f"{frac_flat:.6f}",
+                f"{frac_trend:.6f}",
+                f"{frac_osc:.6f}",
+                f"{frac_noisy:.6f}",
+                f"{sal_min:.3f}",
+                f"{sal_max:.3f}",
+                f"{sal_avg:.3f}",
+                f"{e_min:.6f}",
+                f"{e_max:.6f}",
+                f"{e_avg:.6f}",
+                n_motifs_flat,
+                n_motifs_trend,
+                n_motifs_osc,
+                n_motifs_noisy,
+            ]
+        )
 
 
 def main(argv: List[str] | None = None) -> None:
