@@ -1,6 +1,10 @@
+# lasagna2/cli.py
 from __future__ import annotations
 
+import argparse
+import csv
 from collections import Counter
+from dataclasses import dataclass
 from pathlib import Path
 from typing import List
 
@@ -10,15 +14,10 @@ from .core import (
     FILE_HEADER_STRUCT,
     SEGMENT_ENTRY_STRUCT,
     RESIDUAL_SECTION_HEADER_STRUCT,
-    RESIDUAL_BLOCK_HEADER_STRUCT,
     encode_timeseries,
     decode_timeseries,
-    classify_segment_pattern,
-    extract_motifs,
 )
 
-import argparse
-import csv
 import json
 
 
@@ -26,13 +25,13 @@ import json
 # CSV helpers
 # ---------------------------------------------------------------------------
 def _load_csv_values(path: Path) -> List[float]:
+    """Carica la prima colonna numerica da un CSV (ignorando righe vuote / commenti)."""
     values: List[float] = []
     with path.open("r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if not line or line.startswith("#"):
                 continue
-            # prima colonna
             parts = line.split(",")
             try:
                 values.append(float(parts[0]))
@@ -41,32 +40,137 @@ def _load_csv_values(path: Path) -> List[float]:
     return values
 
 
-def load_csv_timeseries(path: Path, dt: float, t0: str, unit: str) -> TimeSeries:
+def load_timeseries_from_csv(path: Path, dt: float, t0: str, unit: str) -> TimeSeries:
     values = _load_csv_values(path)
     return TimeSeries(values=values, dt=dt, t0=t0, unit=unit)
 
 
 def save_timeseries_to_csv(ts: TimeSeries, path: Path) -> None:
-    """
-    Salva una TimeSeries univariata in CSV "stile Lasagna":
-    - prima riga: header "# value"
-    - poi un valore per riga.
-    """
     with path.open("w", encoding="utf-8") as f:
-        f.write("# value\n")
         for v in ts.values:
             f.write(f"{v:.10g}\n")
 
 
 # ---------------------------------------------------------------------------
-# Lettura metadata + segmenti da .lsg2 (senza decodificare tutto)
+# Pattern classification per segmento
+# ---------------------------------------------------------------------------
+def classify_segment_pattern(seg: SegmentEntry) -> tuple[str, int, float]:
+    """
+    Classifica un segmento in (pattern_type, salience, energy).
+
+    pattern_type ∈ {"flat", "trend", "oscillation", "noisy"}
+    salience ∈ {0, 1, 2}
+    energy ~ (|slope| + Q) * length
+    """
+    length = seg.end_idx - seg.start_idx + 1
+    if length <= 0:
+        return "noisy", 0, 0.0
+
+    a_slope = abs(seg.slope)
+    Q = seg.quant_step_Q
+    predictor_type = seg.predictor_type
+
+    # soglie empiriche MVP (tarabili)
+    SLOPE_FLAT = 0.002
+    SLOPE_TREND = 0.01
+    Q_LOW = 0.05
+    Q_HIGH = 0.3
+
+    # pattern_type
+    if a_slope < SLOPE_FLAT and Q < Q_LOW:
+        # praticamente piatto e poco rumore
+        pattern = "flat"
+    elif predictor_type == 1 and a_slope >= SLOPE_TREND:
+        # retta evidente -> trend
+        pattern = "trend"
+    elif predictor_type in (1, 2) and Q_LOW <= Q <= Q_HIGH:
+        # un po' di struttura + energia media -> oscillazione
+        pattern = "oscillation"
+    else:
+        pattern = "noisy"
+
+    # salience: energia grezza
+    energy = (a_slope * length) + (Q * length)
+    if energy < 1.0:
+        salience = 0
+    elif energy < 5.0:
+        salience = 1
+    else:
+        salience = 2
+
+    return pattern, salience, energy
+
+
+# ---------------------------------------------------------------------------
+# Motifs (layer 2)
+# ---------------------------------------------------------------------------
+@dataclass
+class Motif:
+    start_seg: int
+    end_seg: int
+    pattern: str
+    total_len: int
+    total_energy: float
+
+
+def extract_motifs(segments: List[SegmentEntry]) -> List[Motif]:
+    """Raggruppa segmenti consecutivi con lo stesso pattern in motifs."""
+    if not segments:
+        return []
+
+    motifs: List[Motif] = []
+
+    # primo segmento
+    cur_start = 0
+    cur_pattern, _sal, cur_energy = classify_segment_pattern(segments[0])
+    cur_len = segments[0].end_idx - segments[0].start_idx + 1
+
+    for idx, seg in enumerate(segments[1:], start=1):
+        patt, _sal, energy = classify_segment_pattern(seg)
+        length = seg.end_idx - seg.start_idx + 1
+
+        if patt == cur_pattern:
+            cur_len += length
+            cur_energy += energy
+        else:
+            motifs.append(
+                Motif(
+                    start_seg=cur_start,
+                    end_seg=idx - 1,
+                    pattern=cur_pattern,
+                    total_len=cur_len,
+                    total_energy=cur_energy,
+                )
+            )
+            cur_start = idx
+            cur_pattern = patt
+            cur_len = length
+            cur_energy = energy
+
+    motifs.append(
+        Motif(
+            start_seg=cur_start,
+            end_seg=len(segments) - 1,
+            pattern=cur_pattern,
+            total_len=cur_len,
+            total_energy=cur_energy,
+        )
+    )
+
+    return motifs
+
+
+# ---------------------------------------------------------------------------
+# Lettura metadata + segmenti da .lsg2 (senza decodificare residui)
 # ---------------------------------------------------------------------------
 def read_lsg2_metadata_and_segments(
     data: bytes,
 ) -> tuple[dict, int, List[SegmentEntry], int]:
     """
     Ritorna (ctx, n_points, segments, coding_type) da un buffer .lsg2.
-    Non legge i blocchi residui (solo salta).
+
+    Legge header + context JSON + tabella segmenti + header sezione residui.
+    Non decodifica i blocchi di residui.
     """
     offset = 0
     if len(data) < FILE_HEADER_STRUCT.size:
@@ -87,8 +191,9 @@ def read_lsg2_metadata_and_segments(
     if magic != b"LSG2":
         raise ValueError("Invalid magic, not an LSG2 file")
     if version != 1:
-        raise ValueError(f"Unsupported LSG2 version {version}")
+        raise ValueError(f"Unsupported LSG2 version {version} (expected 1 for MVP)")
 
+    # sanity check basica per evitare allocazioni folli
     if n_points < 0 or n_points > 10_000_000:
         raise ValueError(f"Suspicious n_points={n_points}")
     if n_segments < 0 or n_segments > 1_000_000:
@@ -96,12 +201,15 @@ def read_lsg2_metadata_and_segments(
     if header_len < 0 or header_len > len(data) - offset:
         raise ValueError("header_len is inconsistent with data size")
 
+    # Context JSON
     if len(data) < offset + header_len:
         raise ValueError("Data too short for context JSON")
     ctx_bytes = data[offset : offset + header_len]
     offset += header_len
+
     ctx = json.loads(ctx_bytes.decode("utf-8"))
 
+    # Segment table
     segments: List[SegmentEntry] = []
     for _ in range(n_segments):
         if len(data) < offset + SEGMENT_ENTRY_STRUCT.size:
@@ -133,29 +241,10 @@ def read_lsg2_metadata_and_segments(
             )
         )
 
+    # Residual section header (solo coding_type)
     if len(data) < offset + RESIDUAL_SECTION_HEADER_STRUCT.size:
         raise ValueError("Data too short for residual section header")
     coding_type, _, _, _ = RESIDUAL_SECTION_HEADER_STRUCT.unpack_from(data, offset)
-    offset += RESIDUAL_SECTION_HEADER_STRUCT.size
-
-    # Non leggiamo i blocchi residui, ma controlliamo grossolanamente
-    for _ in range(n_segments):
-        if len(data) < offset + RESIDUAL_BLOCK_HEADER_STRUCT.size:
-            raise ValueError("Data too short for residual block header")
-        seg_id, seg_len, byte_len = RESIDUAL_BLOCK_HEADER_STRUCT.unpack_from(
-            data, offset
-        )
-        offset += RESIDUAL_BLOCK_HEADER_STRUCT.size
-
-        if seg_id < 0 or seg_id >= n_segments:
-            raise ValueError(f"Invalid seg_id {seg_id} in residual block")
-        if seg_len < 0 or byte_len < 0:
-            raise ValueError("Negative seg_len/byte_len in residual block")
-        if len(data) < offset + byte_len:
-            raise ValueError("Data too short for residual block data")
-
-        # salta il blocco
-        offset += byte_len
 
     return ctx, n_points, segments, coding_type
 
@@ -177,17 +266,14 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p_enc.add_argument(
         "--dt", type=float, required=True, help="sampling interval (seconds)"
     )
-    p_enc.add_argument(
-        "--t0", type=str, required=True, help="start timestamp (ISO string)"
-    )
-    p_enc.add_argument("--unit", type=str, required=True, help="unit (string)")
-
+    p_enc.add_argument("--t0", type=str, required=True, help="start timestamp")
+    p_enc.add_argument("--unit", type=str, required=True, help="unit of measure")
     p_enc.add_argument(
         "--segment-mode",
         type=str,
-        default="fixed",
+        default="adaptive",
         choices=["fixed", "adaptive"],
-        help="segmentation mode (fixed or adaptive)",
+        help="segmentation mode (fixed/adaptive)",
     )
     p_enc.add_argument(
         "--segment-length",
@@ -217,23 +303,15 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--predictor",
         type=str,
         default="linear",
-        choices=["mean", "linear", "rw", "auto"],
-        help="predictor type (mean, linear, rw=random-walk, auto=per-segment selection)",
+        help="predictor (mean/linear/rw/auto)",
     )
     p_enc.add_argument(
         "--residual-coding",
         type=str,
-        default="raw",
+        default="varint",
         choices=["raw", "varint"],
-        help="residual coding: raw int32 or ZigZag+varint",
+        help="residual coding type",
     )
-    p_enc.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true",
-        help="verbose",
-    )
-
     p_enc.set_defaults(func=cli_encode)
 
     # decode
@@ -243,30 +321,24 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p_dec.set_defaults(func=cli_decode)
 
     # info
-    p_info = sub.add_parser("info", help="inspect .lsg2 file")
+    p_info = sub.add_parser(
+        "info",
+        help="inspect .lsg2 file metadata and segments",
+    )
     p_info.add_argument("input", type=str, help="input .lsg2 file")
     p_info.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true",
-        help="show stats",
+        "-v", "--verbose", action="store_true", help="show detailed stats"
     )
     p_info.set_defaults(func=cli_info)
 
     # export-tags
-    p_tags = sub.add_parser(
-        "export-tags",
-        help="export segment tags/metrics from .lsg2 to CSV",
-    )
+    p_tags = sub.add_parser("export-tags", help="export segment tags to CSV")
     p_tags.add_argument("input", type=str, help="input .lsg2 file")
     p_tags.add_argument("output", type=str, help="output CSV file with segment tags")
     p_tags.set_defaults(func=cli_export_tags)
 
     # export-motifs
-    p_motifs = sub.add_parser(
-        "export-motifs",
-        help="export motifs (groups of segments by pattern) to CSV",
-    )
+    p_motifs = sub.add_parser("export-motifs", help="export motifs to CSV")
     p_motifs.add_argument("input", type=str, help="input .lsg2 file")
     p_motifs.add_argument("output", type=str, help="output CSV file with motifs")
     p_motifs.set_defaults(func=cli_export_motifs)
@@ -278,7 +350,7 @@ def cli_encode(args: argparse.Namespace) -> None:
     input_path = Path(args.input)
     output_path = Path(args.output)
 
-    ts = load_csv_timeseries(input_path, dt=args.dt, t0=args.t0, unit=args.unit)
+    ts = load_timeseries_from_csv(input_path, dt=args.dt, t0=args.t0, unit=args.unit)
 
     data = encode_timeseries(
         ts,
@@ -292,8 +364,6 @@ def cli_encode(args: argparse.Namespace) -> None:
     )
 
     output_path.write_bytes(data)
-    if getattr(args, "verbose", False):
-        print(f"Encoded {len(ts.values)} points into {len(data)} bytes.")
 
 
 def cli_decode(args: argparse.Namespace) -> None:
@@ -342,6 +412,13 @@ def cli_info(args: argparse.Namespace) -> None:
         2: "rw",
     }
 
+    patterns: List[str] = []
+    saliences: List[int] = []
+    lengths: List[int] = []
+    slopes: List[float] = []
+    Qs: List[float] = []
+    energies: List[float] = []
+
     print("Segments overview:")
     print(
         "  id  start   end   len  pred  patt  sal   energy      mean        slope       Q"
@@ -349,13 +426,6 @@ def cli_info(args: argparse.Namespace) -> None:
     print(
         "  --- ------- ----- ---- ----- ----- --- ---------- ----------- ----------- -----------"
     )
-
-    patterns: List[str] = []
-    saliences: List[int] = []
-    lengths: List[int] = []
-    slopes: List[float] = []
-    Qs: List[float] = []
-    energies: List[float] = []
 
     for seg_id, seg in enumerate(segments):
         length = seg.end_idx - seg.start_idx + 1
@@ -371,8 +441,7 @@ def cli_info(args: argparse.Namespace) -> None:
 
         print(
             f"  {seg_id:3d} {seg.start_idx:7d} {seg.end_idx:5d} {length:4d} "
-            f"{pred_name:5s} {pattern:5s}  {sal:d} "
-            f"{energy:10.3f} "
+            f"{pred_name:5s} {pattern:5s}  {sal:d} {energy:10.3f} "
             f"{seg.mean:11.6f} {seg.slope:11.6f} {seg.quant_step_Q:11.6g}"
         )
 
@@ -383,28 +452,25 @@ def cli_info(args: argparse.Namespace) -> None:
             f"  seg_len : min={min(lengths)}, max={max(lengths)}, "
             f"avg={sum(lengths)/len(lengths):.2f}"
         )
-
         if slopes:
             print(f"  slope   : min={min(slopes):.6f}, max={max(slopes):.6f}")
-
         if Qs:
             print(f"  Q       : min={min(Qs):g}, max={max(Qs):g}")
-
-        c_patterns = Counter(patterns)
-        print("  patterns: " + ", ".join(f"{k}={v}" for k, v in c_patterns.items()))
-
-        if saliences:
-            print(
-                f"  salience: min={min(saliences)}, max={max(saliences)}, "
-                f"avg={sum(saliences)/len(saliences):.2f}"
-            )
-
         if energies:
             print(
                 f"  energy  : min={min(energies):.3f}, max={max(energies):.3f}, "
                 f"avg={sum(energies)/len(energies):.3f}"
             )
 
+        c_patterns = Counter(patterns)
+        print("  patterns: " + ", ".join(f"{k}={v}" for k, v in c_patterns.items()))
+        if saliences:
+            print(
+                f"  salience: min={min(saliences)}, max={max(saliences)}, "
+                f"avg={sum(saliences)/len(saliences):.2f}"
+            )
+
+        # Motifs + profilo alto livello
         motifs = extract_motifs(segments)
         if motifs:
             print("Motifs:")
@@ -421,11 +487,31 @@ def cli_info(args: argparse.Namespace) -> None:
                     f"{m.pattern:11s} {m.total_len:10d} {m.total_energy:12.3f}"
                 )
 
+            total_points = n_points
+            by_pattern_points: dict[str, int] = {}
+            for seg, patt in zip(segments, patterns):
+                length = seg.end_idx - seg.start_idx + 1
+                by_pattern_points[patt] = by_pattern_points.get(patt, 0) + length
+
+            by_pattern_motifs: dict[str, int] = {}
+            for m in motifs:
+                by_pattern_motifs[m.pattern] = by_pattern_motifs.get(m.pattern, 0) + 1
+
+            print("Profile:")
+            print("  pattern       points   frac_pts   segs  motifs")
+            print("  ----------- -------- ---------- ----- -------")
+            for patt, pts in sorted(
+                by_pattern_points.items(), key=lambda kv: kv[1], reverse=True
+            ):
+                frac = pts / total_points if total_points > 0 else 0.0
+                segs = c_patterns.get(patt, 0)
+                mot = by_pattern_motifs.get(patt, 0)
+                print(f"  {patt:11s} {pts:8d} {frac:10.3f} {segs:5d} {mot:7d}")
+
 
 def cli_export_tags(args: argparse.Namespace) -> None:
     input_path = Path(args.input)
     output_path = Path(args.output)
-
     data = input_path.read_bytes()
     ctx, n_points, segments, coding_type = read_lsg2_metadata_and_segments(data)
 
@@ -452,15 +538,12 @@ def cli_export_tags(args: argparse.Namespace) -> None:
                 "Q",
             ]
         )
-
         for seg_id, seg in enumerate(segments):
             length = seg.end_idx - seg.start_idx + 1
             pred_name = predictor_names.get(
                 seg.predictor_type, f"#{seg.predictor_type}"
             )
-            # NB: qui assumiamo che classify_segment_pattern(seg) ritorni (patt, sal, energy)
             pattern, sal, energy = classify_segment_pattern(seg)
-
             writer.writerow(
                 [
                     seg_id,
@@ -481,10 +564,8 @@ def cli_export_tags(args: argparse.Namespace) -> None:
 def cli_export_motifs(args: argparse.Namespace) -> None:
     input_path = Path(args.input)
     output_path = Path(args.output)
-
     data = input_path.read_bytes()
     ctx, n_points, segments, coding_type = read_lsg2_metadata_and_segments(data)
-
     motifs = extract_motifs(segments)
 
     with output_path.open("w", encoding="utf-8", newline="") as f:
@@ -500,7 +581,6 @@ def cli_export_motifs(args: argparse.Namespace) -> None:
                 "total_energy",
             ]
         )
-
         for mid, m in enumerate(motifs):
             n_segs = m.end_seg - m.start_seg + 1
             writer.writerow(

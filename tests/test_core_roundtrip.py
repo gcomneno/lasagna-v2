@@ -1,11 +1,10 @@
-# tests/test_core_roundtrip.py
 from __future__ import annotations
 
 import math
 import subprocess
-import pandas as pd
-
 from pathlib import Path
+
+
 from lasagna2.core import TimeSeries, encode_timeseries, decode_timeseries
 
 
@@ -19,6 +18,22 @@ def rmse(a, b):
         d = x - y
         s += d * d
     return math.sqrt(s / n)
+
+
+def _read_values(path: Path):
+    """Legge la prima colonna numerica da un CSV, ignorando righe vuote o commenti."""
+    vals = []
+    with path.open("r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = line.split(",")
+            try:
+                vals.append(float(parts[0]))
+            except ValueError:
+                continue
+    return vals
 
 
 def test_roundtrip_trend_linear_fixed_raw():
@@ -103,7 +118,7 @@ def test_cli_roundtrip_trend(tmp_path: Path):
     )
     assert result_enc.returncode == 0, result_enc.stderr
 
-    # 2) DECODE via CLI (senza -o, se non è supportato)
+    # 2) DECODE via CLI
     result_dec = subprocess.run(
         [
             "lasagna2",
@@ -116,15 +131,14 @@ def test_cli_roundtrip_trend(tmp_path: Path):
     )
     assert result_dec.returncode == 0, result_dec.stderr
 
-    # 3) Confronto CSV original vs decoded
-    orig = pd.read_csv(in_csv)
-    dec = pd.read_csv(out_csv)
+    # 3) Confronto valori
+    orig = _read_values(in_csv)
+    dec = _read_values(out_csv)
 
-    # Se il codec è lossless:
-    pd.testing.assert_frame_equal(orig, dec)
-
-    # Se è lossy, puoi usare una tolleranza numerica, ad es.:
-    # pd.testing.assert_frame_equal(orig, dec, atol=1e-9, rtol=1e-9)
+    assert len(orig) == len(dec)
+    e = rmse(orig, dec)
+    # su trend perfetto, codec è praticamente lossless
+    assert e < 1e-6
 
 
 def test_cli_roundtrip_sine_noise(tmp_path: Path):
@@ -165,16 +179,10 @@ def test_cli_roundtrip_sine_noise(tmp_path: Path):
     )
     assert result_dec.returncode == 0, result_dec.stderr
 
-    orig_df = pd.read_csv(in_csv)
-    dec_df = pd.read_csv(out_csv)
+    orig = _read_values(in_csv)
+    dec = _read_values(out_csv)
 
-    orig = orig_df["# value"].tolist()
-    dec = dec_df["# value"].tolist()
-
-    # stessa lunghezza
     assert len(orig) == len(dec)
-
-    # codec lossy: controlliamo l'errore medio, non l'uguaglianza esatta
     e = rmse(orig, dec)
-    # soglia da tarare se serve, ma deve restare “piccola”
+    # serie rumorosa: loss moderata accettabile
     assert e < 0.3
