@@ -14,6 +14,7 @@ from .core import (
     encode_timeseries,
     decode_timeseries,
     classify_segment_pattern,
+    extract_motifs,
 )
 
 import argparse
@@ -261,6 +262,15 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p_tags.add_argument("output", type=str, help="output CSV file with segment tags")
     p_tags.set_defaults(func=cli_export_tags)
 
+    # export-motifs
+    p_motifs = sub.add_parser(
+        "export-motifs",
+        help="export motifs (groups of segments by pattern) to CSV",
+    )
+    p_motifs.add_argument("input", type=str, help="input .lsg2 file")
+    p_motifs.add_argument("output", type=str, help="output CSV file with motifs")
+    p_motifs.set_defaults(func=cli_export_motifs)
+
     return p
 
 
@@ -373,22 +383,43 @@ def cli_info(args: argparse.Namespace) -> None:
             f"  seg_len : min={min(lengths)}, max={max(lengths)}, "
             f"avg={sum(lengths)/len(lengths):.2f}"
         )
+
         if slopes:
             print(f"  slope   : min={min(slopes):.6f}, max={max(slopes):.6f}")
+
         if Qs:
             print(f"  Q       : min={min(Qs):g}, max={max(Qs):g}")
+
         c_patterns = Counter(patterns)
         print("  patterns: " + ", ".join(f"{k}={v}" for k, v in c_patterns.items()))
+
         if saliences:
             print(
                 f"  salience: min={min(saliences)}, max={max(saliences)}, "
                 f"avg={sum(saliences)/len(saliences):.2f}"
             )
+
         if energies:
             print(
                 f"  energy  : min={min(energies):.3f}, max={max(energies):.3f}, "
                 f"avg={sum(energies)/len(energies):.3f}"
             )
+
+        motifs = extract_motifs(segments)
+        if motifs:
+            print("Motifs:")
+            print(
+                "  id  seg_start  seg_end  n_segs  patt        total_len  total_energy"
+            )
+            print(
+                "  --- --------- -------- ------- ----------- ----------  ------------"
+            )
+            for mid, m in enumerate(motifs):
+                n_segs = m.end_seg - m.start_seg + 1
+                print(
+                    f"  {mid:3d} {m.start_seg:9d} {m.end_seg:8d} {n_segs:7d} "
+                    f"{m.pattern:11s} {m.total_len:10d} {m.total_energy:12.3f}"
+                )
 
 
 def cli_export_tags(args: argparse.Namespace) -> None:
@@ -443,6 +474,44 @@ def cli_export_tags(args: argparse.Namespace) -> None:
                     f"{seg.mean:.6g}",
                     f"{seg.slope:.6g}",
                     f"{seg.quant_step_Q:.6g}",
+                ]
+            )
+
+
+def cli_export_motifs(args: argparse.Namespace) -> None:
+    input_path = Path(args.input)
+    output_path = Path(args.output)
+
+    data = input_path.read_bytes()
+    ctx, n_points, segments, coding_type = read_lsg2_metadata_and_segments(data)
+
+    motifs = extract_motifs(segments)
+
+    with output_path.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(
+            [
+                "motif_id",
+                "seg_start",
+                "seg_end",
+                "n_segs",
+                "pattern",
+                "total_len",
+                "total_energy",
+            ]
+        )
+
+        for mid, m in enumerate(motifs):
+            n_segs = m.end_seg - m.start_seg + 1
+            writer.writerow(
+                [
+                    mid,
+                    m.start_seg,
+                    m.end_seg,
+                    n_segs,
+                    m.pattern,
+                    m.total_len,
+                    f"{m.total_energy:.6g}",
                 ]
             )
 

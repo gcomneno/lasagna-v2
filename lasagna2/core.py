@@ -80,6 +80,75 @@ def classify_segment_pattern(seg: SegmentEntry) -> tuple[str, int, float]:
     return pattern, salience, energy
 
 
+@dataclass
+class Motif:
+    start_seg: int
+    end_seg: int
+    pattern: str
+    total_len: int
+    total_energy: float
+
+
+def extract_motifs(segments: List[SegmentEntry]) -> List[Motif]:
+    """
+    Raggruppa segmenti consecutivi con lo stesso pattern_type
+    in 'motifs' di livello più alto.
+
+    Un motif ha:
+      - start_seg / end_seg: indici di segmento (in segment-table)
+      - pattern: flat / trend / oscillation / noisy
+      - total_len: numero di punti complessivo
+      - total_energy: somma delle energy dei segmenti
+    """
+    if not segments:
+        return []
+
+    motifs: List[Motif] = []
+
+    # primo segmento
+    cur_start = 0
+    cur_pattern, _sal, cur_energy = classify_segment_pattern(segments[0])
+    cur_len = segments[0].end_idx - segments[0].start_idx + 1
+
+    for idx, seg in enumerate(segments[1:], start=1):
+        patt, _sal, energy = classify_segment_pattern(seg)
+        length = seg.end_idx - seg.start_idx + 1
+
+        if patt == cur_pattern:
+            # continua lo stesso motif
+            cur_len += length
+            cur_energy += energy
+        else:
+            # chiudi il motif precedente
+            motifs.append(
+                Motif(
+                    start_seg=cur_start,
+                    end_seg=idx - 1,
+                    pattern=cur_pattern,
+                    total_len=cur_len,
+                    total_energy=cur_energy,
+                )
+            )
+            # inizia nuovo motif
+            cur_start = idx
+            cur_pattern = patt
+            cur_len = length
+            cur_energy = energy
+
+    # ultimo motif
+    motifs.append(
+        Motif(
+            start_seg=cur_start,
+            end_seg=len(segments) - 1,
+            pattern=cur_pattern,
+            total_len=cur_len,
+            total_energy=cur_energy,
+        )
+    )
+
+    return motifs
+
+
 # ---------------------------------------------------------------------------
 # Binary format structs
 # ---------------------------------------------------------------------------

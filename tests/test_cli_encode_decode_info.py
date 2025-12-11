@@ -152,3 +152,62 @@ def test_cli_export_tags_trend(tmp_path: Path):
         ]
         first_row = next(reader, None)
         assert first_row is not None
+
+
+def test_cli_export_motifs_trend(tmp_path: Path):
+    repo_root = Path(__file__).resolve().parents[1]
+    examples_dir = repo_root / "data" / "examples"
+
+    in_csv = examples_dir / "trend.csv"
+    encoded = tmp_path / "trend.lsg2"
+    motifs_csv = tmp_path / "trend_motifs.csv"
+
+    # encode (come negli altri test)
+    result_enc = subprocess.run(
+        [
+            "lasagna2",
+            "encode",
+            "--dt",
+            "1",
+            "--t0",
+            "0",
+            "--unit",
+            "step",
+            str(in_csv),
+            str(encoded),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert result_enc.returncode == 0, result_enc.stderr
+
+    # export-motifs
+    result_motifs = subprocess.run(
+        [
+            "lasagna2",
+            "export-motifs",
+            str(encoded),
+            str(motifs_csv),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert result_motifs.returncode == 0, result_motifs.stderr
+    assert motifs_csv.exists()
+
+    with motifs_csv.open("r", encoding="utf-8", newline="") as f:
+        reader = csv.reader(f)
+        header = next(reader)
+        assert header == [
+            "motif_id",
+            "seg_start",
+            "seg_end",
+            "n_segs",
+            "pattern",
+            "total_len",
+            "total_energy",
+        ]
+        first_row = next(reader, None)
+        assert first_row is not None
+        # su trend liscio ci aspettiamo un solo motif, pattern "trend"
+        assert first_row[4] == "trend"
