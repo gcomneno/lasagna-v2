@@ -678,7 +678,7 @@ def cli_export_profile(args: argparse.Namespace) -> None:
 
     n_motifs_flat = by_pattern_motifs.get("flat", 0)
     n_motifs_trend = by_pattern_motifs.get("trend", 0)
-    n_motifs_osc = by_pattern_motifs.get("oscillation", 0)
+    n_motifs_oscillation = by_pattern_motifs.get("oscillation", 0)
     n_motifs_noisy = by_pattern_motifs.get("noisy", 0)
 
     # scrivi CSV: una riga per file
@@ -730,7 +730,7 @@ def cli_export_profile(args: argparse.Namespace) -> None:
                 f"{e_avg:.6f}",
                 n_motifs_flat,
                 n_motifs_trend,
-                n_motifs_osc,
+                n_motifs_oscillation,
                 n_motifs_noisy,
             ]
         )

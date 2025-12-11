@@ -231,6 +231,23 @@ lasagna-v2/
 
 ---
 
+## Strumenti ausiliari (`tools/`)
+Nella cartella `tools/` trovi alcuni script di supporto:
+
+- `batch_profile.py`
+  Profilazione semantica batch di file `.lsg2`:
+    python tools/batch_profile.py data/tmp -o data/tmp/profiles.csv
+
+- `lasagna_viewer.py`
+  Visualizza i segmenti (output di lasagna2 export-tags) con grafici semplici:
+    python tools/lasagna_viewer.py data/tmp/sine_noise_tags.csv
+
+- `semantic_events.py`
+  Estrae “eventi” semantici da un profiles.csv:
+    python tools/semantic_events.py data/tmp/profiles.csv data/tmp/events.csv
+
+---
+
 ## Qualità & Sicurezza
 
 - **Pre-commit**:
