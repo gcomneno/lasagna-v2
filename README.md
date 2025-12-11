@@ -1,5 +1,4 @@
-# Lasagna v2 — Brain-Inspired Time-Series Compressor (MVP univariato)
-
+# Lasagna v2 — Brain-Inspired Time-Series Compressor
 > 🧠🍝 **Lasagna v2** è un codec sperimentale per serie temporali univariate:
 > segmentazione adattiva, predittori multipli, quantizzazione percettiva e
 > un primo strato di “pattern tagging” semi-cognitivo.
@@ -10,7 +9,6 @@ Formato e API possono cambiare senza preavviso.
 ---
 
 ## Obiettivi
-
 Lasagna v2 nasce da tre idee:
 
 1. **Non comprimere solo i bit, ma anche la struttura temporale.**
@@ -180,6 +178,19 @@ decoded = decode_timeseries(encoded)
 print(len(decoded.values), decoded.dt, decoded.unit)
 ```
 
+### Esportare i tag dei segmenti
+
+```bash
+lasagna2 export-tags data/tmp/trend.lsg2 data/tmp/trend_tags.csv
+head data/tmp/trend_tags.csv
+```
+
+Output:
+```bash
+seg_id,start,end,len,pred,patt,sal,energy,mean,slope,Q
+0,0,63,64,linear,trend,2,6.40006,3.15,0.1,1e-06
+```
+
 ---
 
 ## Struttura del progetto
@@ -241,14 +252,12 @@ lasagna-v2/
 ---
 
 ## Roadmap
-
-MVP attuale copre **solo univariato**. Idee per le prossime iterazioni:
-
+MVP attuale copre **solo univariato**.
+Idee per le prossime iterazioni:
 - supporto multivariato (più serie correlate),
 - pattern tagging più ricco (eventualmente supervisionato),
 - livelli di “profilo” (`--profile=human`, `--profile=machine`),
 - strumenti di visualizzazione per segmenti, residui e pattern,
 - specifica del formato `.lsg2` più formale / “da paper”.
 
-Contributi, discussioni e idee sono benvenuti,
-ma il progetto resta dichiaratamente sperimentale.
+Contributi, discussioni e idee sono benvenuti, ma il progetto resta dichiaratamente sperimentale.
