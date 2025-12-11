@@ -215,3 +215,41 @@ def test_export_motifs_csv(tmp_path: Path):
         assert first_row is not None
         # su trend liscio ci aspettiamo un solo motif di tipo "trend"
         assert first_row[4] == "trend"
+
+
+def test_export_profile_csv(tmp_path: Path):
+    in_csv = tmp_path / "trend.csv"
+    encoded = tmp_path / "trend.lsg2"
+    profile_csv = tmp_path / "trend_profile.csv"
+
+    values = [0.1 * i for i in range(200)]
+    _write_csv(in_csv, values)
+
+    lasagna_main(
+        [
+            "encode",
+            str(in_csv),
+            str(encoded),
+            "--dt",
+            "1",
+            "--t0",
+            "0",
+            "--unit",
+            "step",
+        ]
+    )
+
+    lasagna_main(["export-profile", str(encoded), str(profile_csv)])
+
+    assert profile_csv.exists()
+
+    with profile_csv.open("r", encoding="utf-8") as f:
+        reader = csv.reader(f)
+        header = next(reader)
+        row = next(reader)
+
+    assert header[0] == "file"
+    assert row[0] == "trend.lsg2"
+    # su trend puro ci aspettiamo tutto "trend"
+    frac_trend_idx = header.index("frac_trend")
+    assert float(row[frac_trend_idx]) > 0.9
