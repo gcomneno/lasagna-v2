@@ -82,6 +82,73 @@ La installazione in modalità editable ti dà:
 
 ---
 
+## Quick demo
+
+Per vedere Lasagna v2 in azione senza dover preparare dati reali, il repo include
+una **demo completa** basata su tre serie sintetiche:
+
+- `trend.csv`        → regime a trend quasi puro
+- `sine_noise.csv`   → sinusoide + trend + rumore
+- `flat_spike.csv`   → plateau con gradino centrale (spike)
+
+La pipeline della demo è:
+
+```text
+CSV → .lsg2 → profiles.csv → events.csv + clusters.csv → PNG
+```
+
+### Esecuzione
+
+Clona il repo, installa il pacchetto (in editable mode) e lancia la demo:
+
+```bash
+git clone https://github.com/…/lasagna-v2.git
+cd lasagna-v2
+
+python -m venv .venv
+source .venv/bin/activate
+
+pip install -e .
+
+make demo
+```
+
+Il target `demo` esegue:
+
+1. generazione dei CSV demo (`data/demo/*.csv`)
+2. encoding in formato binario `.lsg2`
+3. calcolo dei profili (`profiles.csv`)
+4. eventi semantici + cluster (`events.csv`, `clusters.csv`)
+5. export dei tag di segmento (`*_tags.csv`)
+6. generazione delle immagini PNG per `flat_spike`:
+   - `data/demo/flat_spike_tags.segments.png`
+   - `data/demo/flat_spike_tags.energy.png`
+
+Per maggiori dettagli sulla pipeline demo vedi
+[`docs/PIPELINE.md`](docs/PIPELINE.md).
+
+### Use case: sequenze di allarmi (multivalore)
+
+La demo include anche un caso d’uso per **sequenze di allarmi** (eventi con
+più attributi per riga: `timestamp`, `type`, `severity`).
+
+Il flusso è:
+
+```text
+alarms.csv → alarms_intensity.csv → alarms_intensity.lsg2 → profiles/events/clusters
+```
+
+In particolare:
+
+- `tools/generate_fake_alarms.py` genera un log sintetico di allarmi:
+  `data/demo/alarms.csv`.
+- `tools/prep_alarms.py` converte il log multivalore in una serie univariata
+  di intensità allarmi: `data/demo/alarms_intensity.csv`.
+- `make demo` si occupa di encodare anche `alarms_intensity.lsg2` e
+  includerlo automaticamente in `profiles.csv`, `events.csv` e `clusters.csv`.
+
+
+---
 ## Quickstart
 
 ### 1. Esempio `trend` (CSV → LSG2 → CSV)
@@ -236,15 +303,40 @@ Nella cartella `tools/` trovi alcuni script di supporto:
 
 - `batch_profile.py`
   Profilazione semantica batch di file `.lsg2`:
-    python tools/batch_profile.py data/tmp -o data/tmp/profiles.csv
+  ```bash
+  python tools/batch_profile.py data/tmp -o data/tmp/profiles.csv
+  ```
 
 - `lasagna_viewer.py`
-  Visualizza i segmenti (output di lasagna2 export-tags) con grafici semplici:
-    python tools/lasagna_viewer.py data/tmp/sine_noise_tags.csv
+  Visualizza i segmenti (output di `lasagna2 export-tags`) con grafici semplici:
+  ```bash
+  python tools/lasagna_viewer.py data/tmp/sine_noise_tags.csv
+  ```
 
 - `semantic_events.py`
-  Estrae “eventi” semantici da un profiles.csv:
-    python tools/semantic_events.py data/tmp/profiles.csv data/tmp/events.csv
+  Estrae “eventi” semantici da un `profiles.csv`:
+  ```bash
+  python tools/semantic_events.py data/tmp/profiles.csv data/tmp/events.csv
+  ```
+
+- `cluster_profiles.py`
+  Aggiunge una colonna `cluster` a `profiles.csv`:
+  ```bash
+  python tools/cluster_profiles.py data/tmp/profiles.csv data/tmp/clusters.csv
+  ```
+
+- `generate_fake_alarms.py`
+  Genera un log sintetico di allarmi multivalore per la demo:
+  ```bash
+  python tools/generate_fake_alarms.py data/demo/alarms.csv
+  ```
+
+- `prep_alarms.py`
+  Converte un log di allarmi (`timestamp,type,severity`) in una serie univariata
+  di intensità allarmi compatibile con `lasagna2 encode`:
+  ```bash
+  python tools/prep_alarms.py data/demo/alarms.csv data/demo/alarms_intensity.csv --dt 60
+  ```
 
 ---
 
