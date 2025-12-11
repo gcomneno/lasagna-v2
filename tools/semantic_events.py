@@ -58,7 +58,7 @@ def infer_events(profile: Dict[str, Any]) -> List[str]:
     return events
 
 
-def main(argv: list[str] | None = None) -> None:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
             "Derive simple semantic events from a batch profiles CSV "
@@ -66,9 +66,37 @@ def main(argv: list[str] | None = None) -> None:
         )
     )
     parser.add_argument("profiles_csv", help="input profiles CSV")
-    parser.add_argument("events_csv", help="output events CSV")
+    parser.add_argument(
+        "events_csv",
+        nargs="?",
+        help="output events CSV (positional, alternative to -o/--output)",
+    )
+    parser.add_argument(
+        "-o",
+        "--output",
+        dest="events_csv_o",
+        help="output events CSV (alternative to positional events_csv)",
+    )
 
     args = parser.parse_args(argv)
+
+    if args.events_csv and args.events_csv_o:
+        parser.error(
+            "Specify output only as positional 'events_csv' or only with -o/--output, not both."
+        )
+
+    out = args.events_csv or args.events_csv_o
+    if not out:
+        parser.error(
+            "You must specify the output events CSV (positional or via -o/--output)."
+        )
+
+    args.events_csv = out
+    return args
+
+
+def main(argv: list[str] | None = None) -> None:
+    args = parse_args(argv)
 
     in_path = Path(args.profiles_csv)
     out_path = Path(args.events_csv)
