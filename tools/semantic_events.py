@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+
 from pathlib import Path
 from typing import Dict, List, Any
 
@@ -14,6 +15,7 @@ def infer_events(profile: Dict[str, Any]) -> List[str]:
     frac_trend = float(profile.get("frac_trend", 0.0))
     frac_osc = float(profile.get("frac_oscillation", 0.0))
     frac_noisy = float(profile.get("frac_noisy", 0.0))
+    frac_flat = float(profile.get("frac_flat", 0.0))
     energy_avg = float(profile.get("energy_avg", 0.0))
     n_motifs_trend = int(profile.get("n_motifs_trend", 0))
     n_motifs_oscillation = int(profile.get("n_motifs_oscillation", 0))
@@ -31,6 +33,16 @@ def infer_events(profile: Dict[str, Any]) -> List[str]:
     # Mix trend + oscillation
     if frac_trend > 0.2 and frac_osc > 0.2:
         events.append("trend_oscillation_mix")
+
+    # Pattern: flat con uno o pochi bump di trend (tipo flat_spike)
+    if (
+        frac_flat > 0.5
+        and 0.1 < frac_trend < 0.4
+        and n_motifs_trend == 1
+        and frac_osc < 0.1
+        and frac_noisy < 0.1
+    ):
+        events.append("flat_with_trend_bump")
 
     # Rumore significativo
     if frac_noisy > 0.3:
