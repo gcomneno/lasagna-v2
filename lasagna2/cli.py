@@ -9,13 +9,17 @@ from pathlib import Path
 from typing import List
 
 from .core import (
-    TimeSeries,
-    SegmentEntry,
+    FORMAT_VERSION_V1,
+    FORMAT_VERSION_V2,
     FILE_HEADER_STRUCT,
-    SEGMENT_ENTRY_STRUCT,
     RESIDUAL_SECTION_HEADER_STRUCT,
-    encode_timeseries,
+    SEGMENT_ENTRY_STRUCT,
+    SEGMENT_ENTRY_V2_STRUCT,
+    SegmentEntry,
+    TimeSeries,
     decode_timeseries,
+    encode_timeseries,
+    encode_timeseries_v2,
 )
 
 import json
@@ -199,8 +203,14 @@ def read_lsg2_metadata_and_segments(
 
     if magic != b"LSG2":
         raise ValueError("Invalid magic, not an LSG2 file")
-    if version != 1:
-        raise ValueError(f"Unsupported LSG2 version {version} (expected 1 for MVP)")
+    if version not in (
+        FORMAT_VERSION_V1,
+        FORMAT_VERSION_V2,
+    ):
+        raise ValueError(
+            f"Unsupported LSG2 version {version}; "
+            "supported versions are 1 and 2"
+        )
 
     # sanity check basica per evitare allocazioni folli
     if n_points < 0 or n_points > 10_000_000:
@@ -220,23 +230,52 @@ def read_lsg2_metadata_and_segments(
 
     # Segment table
     segments: List[SegmentEntry] = []
+
+    if version == FORMAT_VERSION_V1:
+        segment_struct = SEGMENT_ENTRY_STRUCT
+    else:
+        segment_struct = SEGMENT_ENTRY_V2_STRUCT
+
     for _ in range(n_segments):
-        if len(data) < offset + SEGMENT_ENTRY_STRUCT.size:
-            raise ValueError("Data too short for segment table")
-        (
-            start_idx,
-            end_idx,
-            predictor_type,
-            _pad1,
-            _pad2,
-            _pad3,
-            mean,
-            slope,
-            intercept,
-            Q,
-            seed_value,
-        ) = SEGMENT_ENTRY_STRUCT.unpack_from(data, offset)
-        offset += SEGMENT_ENTRY_STRUCT.size
+        if len(data) < offset + segment_struct.size:
+            raise ValueError(
+                "Data too short for segment table"
+            )
+
+        if version == FORMAT_VERSION_V1:
+            (
+                start_idx,
+                end_idx,
+                predictor_type,
+                _pad1,
+                _pad2,
+                _pad3,
+                mean,
+                slope,
+                intercept,
+                Q,
+                seed_value,
+            ) = SEGMENT_ENTRY_STRUCT.unpack_from(
+                data,
+                offset,
+            )
+        else:
+            (
+                start_idx,
+                end_idx,
+                predictor_type,
+                mean,
+                slope,
+                intercept,
+                Q,
+                seed_value,
+            ) = SEGMENT_ENTRY_V2_STRUCT.unpack_from(
+                data,
+                offset,
+            )
+
+        offset += segment_struct.size
+
         segments.append(
             SegmentEntry(
                 start_idx=start_idx,
@@ -321,6 +360,19 @@ def build_arg_parser() -> argparse.ArgumentParser:
         choices=["raw", "varint"],
         help="residual coding type",
     )
+    p_enc.add_argument(
+        "--format-version",
+        type=int,
+        default=FORMAT_VERSION_V1,
+        choices=[
+            FORMAT_VERSION_V1,
+            FORMAT_VERSION_V2,
+        ],
+        help=(
+            "LSG2 wire format version "
+            "(default: 1; use 2 for frozen L32 V2)"
+        ),
+    )
     p_enc.set_defaults(func=cli_encode)
 
     # decode
@@ -370,7 +422,23 @@ def cli_encode(args: argparse.Namespace) -> None:
 
     ts = load_timeseries_from_csv(input_path, dt=args.dt, t0=args.t0, unit=args.unit)
 
-    data = encode_timeseries(
+    format_version = getattr(
+        args,
+        "format_version",
+        FORMAT_VERSION_V1,
+    )
+
+    if format_version == FORMAT_VERSION_V1:
+        encoder = encode_timeseries
+    elif format_version == FORMAT_VERSION_V2:
+        encoder = encode_timeseries_v2
+    else:
+        raise ValueError(
+            f"Unsupported encode format version "
+            f"{format_version}"
+        )
+
+    data = encoder(
         ts,
         segment_length=args.segment_length,
         predictor=args.predictor,
@@ -399,10 +467,19 @@ def cli_info(args: argparse.Namespace) -> None:
 
     ctx, n_points, segments, coding_type = read_lsg2_metadata_and_segments(data)
 
+    version = FILE_HEADER_STRUCT.unpack_from(
+        data,
+        0,
+    )[1]
+
     # header
     print(f"File        : {input_path.name}")
     print(f"Size        : {len(data)} bytes")
-    print("Format      : LSG2 (MVP v1, univariate)")
+
+    if version == FORMAT_VERSION_V1:
+        print("Format      : LSG2 (MVP v1, univariate)")
+    else:
+        print("Format      : LSG2 (v2 L32, univariate)")
     print()
 
     print("Time series :")
