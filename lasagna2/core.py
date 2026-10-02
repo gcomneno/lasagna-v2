@@ -886,3 +886,568 @@ def decode_timeseries(data: bytes) -> TimeSeries:
             raise ValueError(f"Unknown predictor_type {seg.predictor_type}")
 
     return TimeSeries(values=x_hat, dt=dt, t0=t0, unit=unit)
+
+# ---------------------------------------------------------------------------
+# Version 2 frozen L32 wire path
+# ---------------------------------------------------------------------------
+#
+# M2.4 freezes the V2 segment-entry representation as:
+#
+#     <IIIfffff>
+#
+# The V1 encoder and decoder implementation above remain unchanged.
+# V2 encoding deliberately derives segmentation and predictor selection from
+# the V1 encoder, then re-quantizes residuals using the binary32 metadata that
+# is actually serialized on the V2 wire.
+#
+# The historical public decoder is retained as _decode_timeseries_v1 before
+# decode_timeseries is rebound to the version dispatcher below.
+
+
+_decode_timeseries_v1 = decode_timeseries
+
+
+def _extract_v1_model_for_v2(data: bytes):
+    """Extract V1 header/context/segment metadata for V2 serialization."""
+    if len(data) < FILE_HEADER_STRUCT.size:
+        raise ValueError("Data too short to contain header")
+
+    (
+        magic,
+        version,
+        flags,
+        header_len,
+        n_points,
+        n_segments,
+        reserved1,
+        reserved2,
+    ) = FILE_HEADER_STRUCT.unpack_from(data, 0)
+
+    if magic != b"LSG2":
+        raise ValueError("Invalid magic, not an LSG2 file")
+
+    if version != FORMAT_VERSION_V1:
+        raise ValueError(
+            f"Expected internal V1 reference stream, got version {version}"
+        )
+
+    offset = FILE_HEADER_STRUCT.size
+    context_end = offset + header_len
+
+    if context_end > len(data):
+        raise ValueError("Truncated LSG2 context")
+
+    context_bytes = data[offset:context_end]
+    offset = context_end
+
+    segments: list[SegmentEntry] = []
+
+    for _ in range(n_segments):
+        segment_end = offset + SEGMENT_ENTRY_STRUCT.size
+
+        if segment_end > len(data):
+            raise ValueError("Truncated V1 segment table")
+
+        (
+            start_idx,
+            end_idx,
+            predictor_type,
+            _pad1,
+            _pad2,
+            _pad3,
+            mean,
+            slope,
+            intercept,
+            quant_step_Q,
+            seed_value,
+        ) = SEGMENT_ENTRY_STRUCT.unpack_from(data, offset)
+
+        offset = segment_end
+
+        segments.append(
+            SegmentEntry(
+                start_idx=start_idx,
+                end_idx=end_idx,
+                predictor_type=predictor_type,
+                mean=mean,
+                slope=slope,
+                intercept=intercept,
+                quant_step_Q=quant_step_Q,
+                seed_value=seed_value,
+            )
+        )
+
+    return (
+        (
+            magic,
+            flags,
+            header_len,
+            n_points,
+            n_segments,
+            reserved1,
+            reserved2,
+        ),
+        context_bytes,
+        segments,
+    )
+
+
+def _round_segment_entry_v2(seg: SegmentEntry) -> SegmentEntry:
+    """Round all V2 real metadata through the frozen binary32 wire layout."""
+    try:
+        packed = SEGMENT_ENTRY_V2_STRUCT.pack(
+            seg.start_idx,
+            seg.end_idx,
+            seg.predictor_type,
+            seg.mean,
+            seg.slope,
+            seg.intercept,
+            seg.quant_step_Q,
+            seg.seed_value,
+        )
+    except (OverflowError, struct.error) as exc:
+        raise ValueError(
+            "Segment metadata is not representable in frozen V2 L32 layout"
+        ) from exc
+
+    (
+        start_idx,
+        end_idx,
+        predictor_type,
+        mean,
+        slope,
+        intercept,
+        quant_step_Q,
+        seed_value,
+    ) = SEGMENT_ENTRY_V2_STRUCT.unpack(packed)
+
+    real_values = (
+        mean,
+        slope,
+        intercept,
+        quant_step_Q,
+        seed_value,
+    )
+
+    if any(not math.isfinite(value) for value in real_values):
+        raise ValueError(
+            "V2 segment metadata must be finite"
+        )
+
+    if not math.isfinite(quant_step_Q) or quant_step_Q <= 0.0:
+        raise ValueError(
+            "V2 quantization step Q must be finite and > 0"
+        )
+
+    if predictor_type not in (0, 1, 2):
+        raise ValueError(
+            f"Unsupported V2 predictor_type {predictor_type}"
+        )
+
+    return SegmentEntry(
+        start_idx=start_idx,
+        end_idx=end_idx,
+        predictor_type=predictor_type,
+        mean=mean,
+        slope=slope,
+        intercept=intercept,
+        quant_step_Q=quant_step_Q,
+        seed_value=seed_value,
+    )
+
+
+def encode_timeseries_v2(
+    ts: TimeSeries,
+    segment_length: int = 64,
+    predictor: str = "linear",
+    C_Q: float = 0.5,
+    Q_MIN: float = 1e-6,
+    segment_mode: str = "fixed",
+    min_segment_length: int = 32,
+    max_segment_length: int = 128,
+    mse_threshold: float = 0.5,
+    residual_coding: str = "raw",
+) -> bytes:
+    """
+    Encode a TimeSeries using the frozen Version 2 L32 segment layout.
+
+    Segmentation, statistics and predictor selection are obtained from the
+    unchanged V1 encoder. Segment metadata is then rounded exactly through
+    the frozen <IIIfffff> representation before residuals are recomputed.
+
+    Random-walk encoding preserves the frozen semantic rule: samples after
+    the seed are predicted from the previous ORIGINAL sample.
+    """
+    v1_reference = encode_timeseries(
+        ts,
+        segment_length=segment_length,
+        predictor=predictor,
+        C_Q=C_Q,
+        Q_MIN=Q_MIN,
+        segment_mode=segment_mode,
+        min_segment_length=min_segment_length,
+        max_segment_length=max_segment_length,
+        mse_threshold=mse_threshold,
+        residual_coding=residual_coding,
+    )
+
+    (
+        header,
+        context_bytes,
+        v1_segments,
+    ) = _extract_v1_model_for_v2(
+        v1_reference
+    )
+
+    (
+        magic,
+        flags,
+        header_len,
+        n_points,
+        n_segments,
+        reserved1,
+        reserved2,
+    ) = header
+
+    if n_points != len(ts.values):
+        raise ValueError(
+            "Internal V1 model point count does not match TimeSeries"
+        )
+
+    v2_segments = [
+        _round_segment_entry_v2(seg)
+        for seg in v1_segments
+    ]
+
+    q_resid_segments: list[list[int]] = []
+
+    for seg in v2_segments:
+        if seg.end_idx < seg.start_idx:
+            raise ValueError(
+                "Invalid V2 segment extent"
+            )
+
+        x_seg = list(
+            ts.values[
+                seg.start_idx : seg.end_idx + 1
+            ]
+        )
+
+        expected_length = (
+            seg.end_idx - seg.start_idx + 1
+        )
+
+        if len(x_seg) != expected_length:
+            raise ValueError(
+                "V2 segment lies outside TimeSeries"
+            )
+
+        preds = _build_preds_for_segmentation(
+            x_seg,
+            predictor_type=seg.predictor_type,
+            mean=seg.mean,
+            slope=seg.slope,
+            intercept=seg.intercept,
+            seed_value=seg.seed_value,
+        )
+
+        Q = seg.quant_step_Q
+
+        q_res = [
+            round((value - pred) / Q)
+            for value, pred in zip(x_seg, preds)
+        ]
+
+        q_resid_segments.append(q_res)
+
+    if residual_coding == "raw":
+        coding_type = RESIDUAL_CODEC_RAW_INT32
+    elif residual_coding == "varint":
+        coding_type = RESIDUAL_CODEC_VARINT
+    else:
+        raise ValueError(
+            f"Unknown residual_coding '{residual_coding}', "
+            "expected 'raw' or 'varint'"
+        )
+
+    buf = bytearray()
+
+    buf += FILE_HEADER_STRUCT.pack(
+        magic,
+        FORMAT_VERSION_V2,
+        flags,
+        header_len,
+        n_points,
+        n_segments,
+        reserved1,
+        reserved2,
+    )
+
+    buf += context_bytes
+
+    for seg in v2_segments:
+        buf += SEGMENT_ENTRY_V2_STRUCT.pack(
+            seg.start_idx,
+            seg.end_idx,
+            seg.predictor_type,
+            seg.mean,
+            seg.slope,
+            seg.intercept,
+            seg.quant_step_Q,
+            seg.seed_value,
+        )
+
+    buf += RESIDUAL_SECTION_HEADER_STRUCT.pack(
+        coding_type,
+        0,
+        0,
+        0,
+    )
+
+    for seg_id, q_res in enumerate(q_resid_segments):
+        seg_len = len(q_res)
+
+        if coding_type == RESIDUAL_CODEC_RAW_INT32:
+            byte_len = seg_len * 4
+
+            buf += RESIDUAL_BLOCK_HEADER_STRUCT.pack(
+                seg_id,
+                seg_len,
+                byte_len,
+            )
+
+            if seg_len:
+                buf += struct.pack(
+                    f"<{seg_len}i",
+                    *q_res,
+                )
+        else:
+            payload = encode_int_list_varint(
+                q_res
+            )
+
+            buf += RESIDUAL_BLOCK_HEADER_STRUCT.pack(
+                seg_id,
+                seg_len,
+                len(payload),
+            )
+
+            buf += payload
+
+    return bytes(buf)
+
+
+def _decode_timeseries_v2(data: bytes) -> TimeSeries:
+    """
+    Decode Version 2 by losslessly widening L32 metadata to the V1 semantic
+    representation, then invoking the unchanged V1 reconstruction path.
+    """
+    if len(data) < FILE_HEADER_STRUCT.size:
+        raise ValueError(
+            "Data too short to contain header"
+        )
+
+    (
+        magic,
+        version,
+        flags,
+        header_len,
+        n_points,
+        n_segments,
+        reserved1,
+        reserved2,
+    ) = FILE_HEADER_STRUCT.unpack_from(
+        data,
+        0,
+    )
+
+    if magic != b"LSG2":
+        raise ValueError(
+            "Invalid magic, not an LSG2 file"
+        )
+
+    if version != FORMAT_VERSION_V2:
+        raise ValueError(
+            f"Expected LSG2 version 2, got {version}"
+        )
+
+    offset = FILE_HEADER_STRUCT.size
+
+    context_end = offset + header_len
+
+    if context_end > len(data):
+        raise ValueError(
+            "Truncated LSG2 context"
+        )
+
+    context_bytes = data[
+        offset:context_end
+    ]
+
+    offset = context_end
+
+    expanded = bytearray()
+
+    expanded += FILE_HEADER_STRUCT.pack(
+        magic,
+        FORMAT_VERSION_V1,
+        flags,
+        header_len,
+        n_points,
+        n_segments,
+        reserved1,
+        reserved2,
+    )
+
+    expanded += context_bytes
+
+    expected_start = 0
+
+    for _ in range(n_segments):
+        segment_end = (
+            offset
+            + SEGMENT_ENTRY_V2_STRUCT.size
+        )
+
+        if segment_end > len(data):
+            raise ValueError(
+                "Truncated V2 segment table"
+            )
+
+        (
+            start_idx,
+            end_idx,
+            predictor_type,
+            mean,
+            slope,
+            intercept,
+            quant_step_Q,
+            seed_value,
+        ) = SEGMENT_ENTRY_V2_STRUCT.unpack_from(
+            data,
+            offset,
+        )
+
+        offset = segment_end
+
+        if predictor_type not in (0, 1, 2):
+            raise ValueError(
+                f"Unsupported V2 predictor_type "
+                f"{predictor_type}"
+            )
+
+        if end_idx < start_idx:
+            raise ValueError(
+                "Invalid V2 segment extent"
+            )
+
+        if start_idx != expected_start:
+            raise ValueError(
+                "Non-contiguous V2 segment table"
+            )
+
+        expected_start = end_idx + 1
+
+        real_values = (
+            mean,
+            slope,
+            intercept,
+            quant_step_Q,
+            seed_value,
+        )
+
+        if any(
+            not math.isfinite(value)
+            for value in real_values
+        ):
+            raise ValueError(
+                "V2 segment metadata must be finite"
+            )
+
+        if (
+            not math.isfinite(quant_step_Q)
+            or quant_step_Q <= 0.0
+        ):
+            raise ValueError(
+                "V2 quantization step Q must "
+                "be finite and > 0"
+            )
+
+        expanded += SEGMENT_ENTRY_STRUCT.pack(
+            start_idx,
+            end_idx,
+            predictor_type,
+            0,
+            0,
+            0,
+            float(mean),
+            float(slope),
+            float(intercept),
+            float(quant_step_Q),
+            float(seed_value),
+        )
+
+    if expected_start != n_points and n_segments:
+        raise ValueError(
+            "V2 segment table does not cover "
+            "the declared point count"
+        )
+
+    if n_segments == 0 and n_points != 0:
+        raise ValueError(
+            "Non-empty V2 series has no segments"
+        )
+
+    expanded += data[offset:]
+
+    return _decode_timeseries_v1(
+        bytes(expanded)
+    )
+
+
+def decode_timeseries(data: bytes) -> TimeSeries:
+    """
+    Decode a supported LSG2 stream.
+
+    Version 1 is delegated byte-for-byte to the historical decoder.
+    Version 2 uses the frozen 32-byte L32 segment-entry representation.
+    Unknown versions fail closed.
+    """
+    if len(data) < FILE_HEADER_STRUCT.size:
+        raise ValueError(
+            "Data too short to contain header"
+        )
+
+    (
+        magic,
+        version,
+        _flags,
+        _header_len,
+        _n_points,
+        _n_segments,
+        _reserved1,
+        _reserved2,
+    ) = FILE_HEADER_STRUCT.unpack_from(
+        data,
+        0,
+    )
+
+    if magic != b"LSG2":
+        raise ValueError(
+            "Invalid magic, not an LSG2 file"
+        )
+
+    if version == FORMAT_VERSION_V1:
+        return _decode_timeseries_v1(
+            data
+        )
+
+    if version == FORMAT_VERSION_V2:
+        return _decode_timeseries_v2(
+            data
+        )
+
+    raise ValueError(
+        f"Unsupported LSG2 version {version}; "
+        "supported versions are 1 and 2"
+    )
