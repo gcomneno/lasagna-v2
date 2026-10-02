@@ -1,4 +1,16 @@
 # Brain-Inspired Compressor Manifesto
+
+> **Historical/conceptual note**
+>
+> This document preserves the original conceptual framing that motivated
+> Lasagna 2. The current technical positioning of the project is
+> **Lasagna 2 — Time Series Predictive Codec**.
+>
+> “Brain-inspired” is not intended as a neuroscientific claim. The current
+> implementation is an experimental predictive codec for structured
+> univariate time series, centered on segmentation, local prediction,
+> residual quantization, residual coding, and rate–distortion analysis.
+
 ## (Lasagna v2 – Time Series Edition, MVP)
 Non vogliamo solo schiacciare bit. Vogliamo lasciare al dato una forma che una macchina possa ancora capire.
 

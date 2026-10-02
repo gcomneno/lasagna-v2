@@ -162,6 +162,13 @@ def extract_motifs(segments: List[SegmentEntry]) -> List[Motif]:
 # n_segments (I)
 # reserved1 (I)
 # reserved2 (I)
+FORMAT_VERSION_V1 = 1
+FORMAT_VERSION_V2 = 2
+
+RESIDUAL_CODEC_RAW_INT32 = 0
+RESIDUAL_CODEC_VARINT = 1
+RESIDUAL_CODEC_ZERO_RUN_VARINT = 2
+
 FILE_HEADER_STRUCT = struct.Struct("<4sHHIIIII")
 
 # Segment entry:
@@ -176,7 +183,35 @@ FILE_HEADER_STRUCT = struct.Struct("<4sHHIIIII")
 # intercept (d)
 # Q (d)
 # seed_value (d)
+# Version 1 segment entry: 64 bytes.
 SEGMENT_ENTRY_STRUCT = struct.Struct("<6Iddddd")
+
+# M2.3 candidate L32 ONLY — not yet the frozen V2 wire layout.
+#
+# Semantic field order frozen by M2.2A:
+#   start_idx
+#   end_idx
+#   predictor_type
+#   mean
+#   slope
+#   intercept
+#   quant_step_Q
+#   seed_value
+#
+# Exact semantic fields:
+#   start_idx, end_idx, predictor_type
+#
+# Bounded-loss candidate fields in L32:
+#   mean, slope, intercept, quant_step_Q, seed_value -> float32
+#
+# IMPORTANT:
+#   - M2.2A freezes semantics, not these numeric widths.
+#   - M2.3 must characterize the closed candidate-layout set.
+#   - M2.4 must freeze exactly one physical V2 layout.
+#   - No encoder may emit format_version=2 before that freeze.
+#
+# L32 size: 32 bytes.
+SEGMENT_ENTRY_V2_STRUCT = struct.Struct("<IIIfffff")
 
 # Residual section header:
 # coding_type (I)

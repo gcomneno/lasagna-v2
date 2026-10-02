@@ -1,5 +1,5 @@
 """
-Lasagna v2 – Brain-inspired time series compressor (univariate MVP).
+Lasagna 2 – Time Series Predictive Codec (experimental univariate MVP).
 """
 
 from .core import TimeSeries, encode_timeseries, decode_timeseries

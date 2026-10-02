@@ -1,7 +1,7 @@
 [project]
 name = "lasagna-v2"
 version = "0.1.1"
-description = "Brain-inspired time series compressor (Lasagna v2, univariate MVP)"
+description = "Experimental predictive codec for structured univariate time series"
 authors = [
   { name = "Giancarlo" }
 ]

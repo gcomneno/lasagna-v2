@@ -13,3 +13,7 @@
 # Non tentare merge "furbi" su file di lock, se li userai
 poetry.lock merge=union
 Pipfile.lock merge=union
+
+# M2.2B protocol documents preserve byte-frozen EOF layout.
+docs/rate-distortion-design.md whitespace=-blank-at-eof
+docs/protocol-history/m2-2b/v*/rate-distortion-design.md whitespace=-blank-at-eof

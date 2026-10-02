@@ -1,7 +1,11 @@
-# Lasagna v2 — Brain-Inspired Time-Series Compressor
-> 🧠🍝 **Lasagna v2** è un codec sperimentale per serie temporali univariate:
-> segmentazione adattiva, predittori multipli, quantizzazione percettiva e
-> un primo strato di “pattern tagging” semi-cognitivo.
+# Lasagna 2 — Time Series Predictive Codec
+> 🍝 **Lasagna 2** è un codec predittivo sperimentale per serie temporali
+> univariate strutturate: combina segmentazione, predizione locale,
+> quantizzazione dei residui e codifica compatta dei residui.
+>
+> Il progetto esplora il compromesso **rate–distortion** su segnali localmente
+> prevedibili; non è pensato come sostituto general-purpose di compressori
+> lossless come gzip o zstd.
 
 ⚠️ **Stato del progetto:** MVP di ricerca, non ancora pensato per produzione.
 Formato e API possono cambiare senza preavviso.
@@ -19,9 +23,12 @@ Lasagna v2 nasce da tre idee:
    Prima si cattura il pattern principale (trend, flat, oscillazione),
    poi si impacchetta l’errore con una quantizzazione controllata.
 
-3. **Tenere un occhio al “cervello”, ma parlare con le macchine.**
-   Non è un codec percettivo umano, ma prende spunto da concetti come:
-   chunking, priming, multi-livello, salienza.
+3. **Esplorare struttura locale e rappresentazioni compatte.**
+   Il codec usa segmentazione e predittori locali per descrivere la parte
+   prevedibile del segnale e codificare separatamente i residui.
+
+   Il framing “brain-inspired” appartiene all'origine concettuale del progetto
+   e non rappresenta un modello neuroscientifico.
 
 Per la parte concettuale vedi anche
 📄 [`docs/manifesto.md`](docs/manifesto.md).
@@ -56,6 +63,13 @@ Per la parte concettuale vedi anche
   - header con meta-info (JSON compresso),
   - tabella segmenti,
   - sezione residui con blocchi per segmento.
+
+### Terminologia sperimentale
+
+Le etichette `motif`, `pattern` e `cluster` presenti nell'MVP sono euristiche
+e raggruppamenti rule-based. Non implicano motif discovery statistica,
+clustering statistico o validazione neuroscientifica.
+
 
 ---
 
@@ -153,7 +167,7 @@ In particolare:
 
 ### 1. Esempio `trend` (CSV → LSG2 → CSV)
 
-Encode (trend quasi perfettamente lossless):
+Encode (trend sintetico con errore di ricostruzione prossimo a zero):
 
 ```bash
 lasagna2 encode   --dt 1   --t0 0   --unit step   data/examples/trend.csv   data/tmp/trend.lsg2
@@ -275,7 +289,7 @@ lasagna-v2/
     examples/          # esempi di serie (trend, sin+noise, ...)
 
   docs/
-    manifesto.md       # “Brain-Inspired Compressor Manifesto”
+    manifesto.md       # framing storico/conceptual “brain-inspired”
     examples-trend-sine.md
 
   tests/

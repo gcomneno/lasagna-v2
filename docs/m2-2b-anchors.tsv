@@ -1,0 +1,24 @@
+# Lasagna 2 M2.2B canonical anchor manifest v1.1
+# Format: anchor_id<TAB>verbatim_phrase
+M2B-SECTION-001	## 16. M2.2B — Executable methodology freeze
+M2B-PROV-001	PROVENANCE_WORLD = B
+M2B-PROV-002	M1.6 SHALL NOT contribute to M2.3 coverage.
+M2B-ANCHOR-001	The canonical anchor manifest SHALL be normative.
+M2B-ANCHOR-002	The verifier SHALL NOT contain an independent canonical phrase list.
+M2B-QUAL-001	qualifying(reference_segment) SHALL be candidate-independent.
+M2B-STRATUM-001	stratum(segment) = predictor_type stored by the frozen V1 reference encode
+M2B-COVERAGE-001	M2.2B-COVERAGE: each of MEAN, LINEAR and RW SHALL contain at least 500 qualifying reference segments.
+M2B-PRNG-001	PRNG = SplitMix64
+M2B-CASE-001	CASE_LENGTH = 512
+M2B-GEN-001	GENERATOR = mean_stationary_v1
+M2B-GEN-002	GENERATOR = linear_trend_v1
+M2B-GEN-003	GENERATOR = random_walk_v1
+M2B-REF-001	REFERENCE_CORE_SHA256 = a29c3dd384812061b24652a74f2c89236ed7e9bf4803fc2b2512f9c367da1701
+M2B-RATE-001	Candidate selection SHALL use measured comparable encoded rate, not nominal segment-entry size.
+M2B-TIE-001	FINAL_CANONICAL_TIE_BREAK = L52 > L40_PRED64 > L40_QSEED64 > L32
+M2B-SEED-001	Seed-shopping SHALL be prohibited.
+M2B-CORPUS-001	CORPUS_GENERATION_AUTHORIZED = NO
+M2B-ICC-001	M2.2B-ICC-RATE: ICC_rate remains NOT DEFINED.
+M2B-PHASE-001	M2.2C SHALL be the only phase authorized to materialize the frozen M2.3 corpus.
+M2B-REV-001	PROTOCOL_REVISION = 1.1
+M2B-REFCTX-001	REFERENCE_TIMESERIES_CONTEXT = dt=1.0; t0=1970-01-01T00:00:00Z; unit=benchmark
