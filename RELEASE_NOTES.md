@@ -1,6 +1,6 @@
-# Lasagna 2 — Unreleased V2 validation milestone
+# Lasagna 2 — v0.2.2 (2026-10-03)
 
-This milestone completes the current V2 physical-layout validation cycle
+This release completes the current V2 physical-layout validation cycle
 without changing protocol revision 2.1.
 
 ## Highlights
