@@ -26,9 +26,7 @@ def test_v1_encoder_still_emits_version_1() -> None:
         residual_coding="raw",
     )
 
-    assert _header(encoded)[1] == (
-        core.FORMAT_VERSION_V1
-    )
+    assert _header(encoded)[1] == (core.FORMAT_VERSION_V1)
 
 
 def test_v2_linear_raw_byte_layout() -> None:
@@ -72,63 +70,41 @@ def test_v2_linear_raw_byte_layout() -> None:
 
     assert header_len == len(context)
 
-    segment_offset = (
-        core.FILE_HEADER_STRUCT.size
-        + header_len
-    )
+    segment_offset = core.FILE_HEADER_STRUCT.size + header_len
 
-    expected_entry = (
-        core.SEGMENT_ENTRY_V2_STRUCT.pack(
-            0,
-            3,
-            1,
-            2.5,
-            1.0,
-            1.0,
-            1e-6,
-            1.0,
-        )
+    expected_entry = core.SEGMENT_ENTRY_V2_STRUCT.pack(
+        0,
+        3,
+        1,
+        2.5,
+        1.0,
+        1.0,
+        1e-6,
+        1.0,
     )
 
     actual_entry = encoded[
-        segment_offset:
-        segment_offset
-        + core.SEGMENT_ENTRY_V2_STRUCT.size
+        segment_offset : segment_offset + core.SEGMENT_ENTRY_V2_STRUCT.size
     ]
 
     assert actual_entry == expected_entry
     assert len(actual_entry) == 32
 
-    residual_header_offset = (
-        segment_offset
-        + core.SEGMENT_ENTRY_V2_STRUCT.size
-    )
+    residual_header_offset = segment_offset + core.SEGMENT_ENTRY_V2_STRUCT.size
 
-    assert (
-        core.RESIDUAL_SECTION_HEADER_STRUCT.unpack_from(
-            encoded,
-            residual_header_offset,
-        )
-        == (core.RESIDUAL_CODEC_RAW_INT32, 0, 0, 0)
-    )
+    assert core.RESIDUAL_SECTION_HEADER_STRUCT.unpack_from(
+        encoded,
+        residual_header_offset,
+    ) == (core.RESIDUAL_CODEC_RAW_INT32, 0, 0, 0)
 
-    block_offset = (
-        residual_header_offset
-        + core.RESIDUAL_SECTION_HEADER_STRUCT.size
-    )
+    block_offset = residual_header_offset + core.RESIDUAL_SECTION_HEADER_STRUCT.size
 
-    assert (
-        core.RESIDUAL_BLOCK_HEADER_STRUCT.unpack_from(
-            encoded,
-            block_offset,
-        )
-        == (0, 4, 16)
-    )
+    assert core.RESIDUAL_BLOCK_HEADER_STRUCT.unpack_from(
+        encoded,
+        block_offset,
+    ) == (0, 4, 16)
 
-    payload_offset = (
-        block_offset
-        + core.RESIDUAL_BLOCK_HEADER_STRUCT.size
-    )
+    payload_offset = block_offset + core.RESIDUAL_BLOCK_HEADER_STRUCT.size
 
     assert encoded[payload_offset:] == (
         struct.pack(
@@ -151,9 +127,7 @@ def test_v2_linear_raw_byte_layout() -> None:
 
     assert len(encoded) == expected_size
 
-    decoded = core.decode_timeseries(
-        encoded
-    )
+    decoded = core.decode_timeseries(encoded)
 
     assert decoded.values == pytest.approx(
         ts.values,
@@ -168,18 +142,12 @@ def test_v2_linear_raw_byte_layout() -> None:
         ("mean", [2.0] * 8),
         (
             "linear",
-            [
-                1.0 + 0.5 * index
-                for index in range(8)
-            ],
+            [1.0 + 0.5 * index for index in range(8)],
         ),
         ("rw", [3.0] * 8),
         (
             "auto",
-            [
-                1.0 + 0.5 * index
-                for index in range(8)
-            ],
+            [1.0 + 0.5 * index for index in range(8)],
         ),
     ],
 )
@@ -207,13 +175,9 @@ def test_v2_roundtrip_supported_modes(
         residual_coding=residual_coding,
     )
 
-    assert _header(encoded)[1] == (
-        core.FORMAT_VERSION_V2
-    )
+    assert _header(encoded)[1] == (core.FORMAT_VERSION_V2)
 
-    decoded = core.decode_timeseries(
-        encoded
-    )
+    decoded = core.decode_timeseries(encoded)
 
     assert decoded.dt == ts.dt
     assert decoded.t0 == ts.t0
@@ -246,15 +210,9 @@ def test_public_decoder_preserves_v1_path() -> None:
         residual_coding="varint",
     )
 
-    historical = (
-        core._decode_timeseries_v1(
-            encoded
-        )
-    )
+    historical = core._decode_timeseries_v1(encoded)
 
-    dispatched = core.decode_timeseries(
-        encoded
-    )
+    dispatched = core.decode_timeseries(encoded)
 
     assert dispatched == historical
 
@@ -281,13 +239,9 @@ def test_unknown_version_fails_closed() -> None:
 
     with pytest.raises(
         ValueError,
-        match=(
-            r"Unsupported LSG2 version 65535"
-        ),
+        match=(r"Unsupported LSG2 version 65535"),
     ):
-        core.decode_timeseries(
-            bytes(encoded)
-        )
+        core.decode_timeseries(bytes(encoded))
 
 
 def test_v2_rejects_q_that_rounds_to_zero() -> None:
@@ -297,10 +251,7 @@ def test_v2_rejects_q_that_rounds_to_zero() -> None:
 
     with pytest.raises(
         ValueError,
-        match=(
-            r"quantization step Q "
-            r"must be finite and > 0"
-        ),
+        match=(r"quantization step Q " r"must be finite and > 0"),
     ):
         core.encode_timeseries_v2(
             ts,

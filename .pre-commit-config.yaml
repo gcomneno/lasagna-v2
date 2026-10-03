@@ -4,7 +4,11 @@ repos:
     hooks:
       - id: check-yaml
       - id: end-of-file-fixer
+        # Protocol evidence is intentionally byte-frozen.
+        exclude: '^(docs/rate-distortion-design\.md|docs/protocol-history/m2-2b/v(1\.0|1\.1|1\.2|2\.0|2\.1)/rate-distortion-design\.md)$'
       - id: trailing-whitespace
+        # Protocol evidence is intentionally byte-frozen.
+        exclude: '^(docs/rate-distortion-design\.md|docs/protocol-history/m2-2b/v(1\.0|1\.1|1\.2|2\.0|2\.1)/rate-distortion-design\.md)$'
       - id: check-added-large-files
         args: ["--maxkb=512"]
 
@@ -13,12 +17,16 @@ repos:
     hooks:
       - id: black
         language_version: python3
+        # Frozen scientific core: formatting must not change its bytes.
+        exclude: '^lasagna2/core\.py$'
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.6.9
     hooks:
       - id: ruff
         args: ["--fix"]
+        # Frozen scientific core: mutating lint fixes are forbidden.
+        exclude: '^lasagna2/core\.py$'
 
   - repo: https://github.com/Yelp/detect-secrets
     rev: v1.5.0

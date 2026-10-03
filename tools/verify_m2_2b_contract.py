@@ -10,9 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DOC = ROOT / "docs" / "rate-distortion-design.md"
 MANIFEST = ROOT / "docs" / "m2-2b-anchors.tsv"
 
-HASH_RE = re.compile(
-    r"EXPECTED_M2_2B_ANCHOR_MANIFEST_SHA256 = ([0-9a-f]{64})"
-)
+HASH_RE = re.compile(r"EXPECTED_M2_2B_ANCHOR_MANIFEST_SHA256 = ([0-9a-f]{64})")
 
 
 def main() -> int:
@@ -71,12 +69,7 @@ def main() -> int:
 
         anchor_id, phrase = raw_line.split("\t", 1)
 
-        if (
-            not anchor_id
-            or not phrase
-            or anchor_id in seen_ids
-            or "\t" in phrase
-        ):
+        if not anchor_id or not phrase or anchor_id in seen_ids or "\t" in phrase:
             print(f"MALFORMED_LINE={lineno}")
             print("CLASSIFICATION=HARNESS_INVALID")
             print("MANIFEST_SCHEMA_GATE=FAIL")

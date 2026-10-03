@@ -11,13 +11,16 @@ def test_residual_codec_ids_are_explicit_and_distinct() -> None:
     assert core.RESIDUAL_CODEC_VARINT == 1
     assert core.RESIDUAL_CODEC_ZERO_RUN_VARINT == 2
 
-    assert len(
-        {
-            core.RESIDUAL_CODEC_RAW_INT32,
-            core.RESIDUAL_CODEC_VARINT,
-            core.RESIDUAL_CODEC_ZERO_RUN_VARINT,
-        }
-    ) == 3
+    assert (
+        len(
+            {
+                core.RESIDUAL_CODEC_RAW_INT32,
+                core.RESIDUAL_CODEC_VARINT,
+                core.RESIDUAL_CODEC_ZERO_RUN_VARINT,
+            }
+        )
+        == 3
+    )
 
 
 def test_v1_segment_entry_size_is_unchanged() -> None:

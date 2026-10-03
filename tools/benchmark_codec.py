@@ -111,21 +111,13 @@ def error_metrics(
     reconstructed: Sequence[float],
 ) -> tuple[float, float]:
     if len(original) != len(reconstructed):
-        raise ValueError(
-            f"Length mismatch: {len(original)} != {len(reconstructed)}"
-        )
+        raise ValueError(f"Length mismatch: {len(original)} != {len(reconstructed)}")
 
     if not original:
         return 0.0, 0.0
 
-    squared_errors = [
-        (a - b) ** 2
-        for a, b in zip(original, reconstructed)
-    ]
-    absolute_errors = [
-        abs(a - b)
-        for a, b in zip(original, reconstructed)
-    ]
+    squared_errors = [(a - b) ** 2 for a, b in zip(original, reconstructed)]
+    absolute_errors = [abs(a - b) for a, b in zip(original, reconstructed)]
 
     rmse = math.sqrt(sum(squared_errors) / len(original))
     max_abs_error = max(absolute_errors)
@@ -144,17 +136,9 @@ def make_result(
     rmse: float,
     max_abs_error: float,
 ) -> BenchmarkResult:
-    bits_per_sample = (
-        encoded_bytes * 8 / n_samples
-        if n_samples
-        else 0.0
-    )
+    bits_per_sample = encoded_bytes * 8 / n_samples if n_samples else 0.0
 
-    compression_ratio = (
-        raw_bytes / encoded_bytes
-        if encoded_bytes
-        else math.inf
-    )
+    compression_ratio = raw_bytes / encoded_bytes if encoded_bytes else math.inf
 
     return BenchmarkResult(
         dataset=dataset,
@@ -186,9 +170,7 @@ def compress_zstd(raw: bytes) -> bytes:
             errors="replace",
         ).strip()
 
-        raise RuntimeError(
-            f"zstd failed with status {completed.returncode}: {message}"
-        )
+        raise RuntimeError(f"zstd failed with status {completed.returncode}: {message}")
 
     return completed.stdout
 
@@ -329,9 +311,7 @@ def write_results_csv(
 
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description=(
-            "Run the Lasagna v2 M1-A synthetic sanity benchmark."
-        )
+        description=("Run the Lasagna v2 M1-A synthetic sanity benchmark.")
     )
 
     parser.add_argument(

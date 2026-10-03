@@ -208,8 +208,7 @@ def read_lsg2_metadata_and_segments(
         FORMAT_VERSION_V2,
     ):
         raise ValueError(
-            f"Unsupported LSG2 version {version}; "
-            "supported versions are 1 and 2"
+            f"Unsupported LSG2 version {version}; " "supported versions are 1 and 2"
         )
 
     # sanity check basica per evitare allocazioni folli
@@ -238,9 +237,7 @@ def read_lsg2_metadata_and_segments(
 
     for _ in range(n_segments):
         if len(data) < offset + segment_struct.size:
-            raise ValueError(
-                "Data too short for segment table"
-            )
+            raise ValueError("Data too short for segment table")
 
         if version == FORMAT_VERSION_V1:
             (
@@ -368,10 +365,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
             FORMAT_VERSION_V1,
             FORMAT_VERSION_V2,
         ],
-        help=(
-            "LSG2 wire format version "
-            "(default: 1; use 2 for frozen L32 V2)"
-        ),
+        help=("LSG2 wire format version " "(default: 1; use 2 for frozen L32 V2)"),
     )
     p_enc.set_defaults(func=cli_encode)
 
@@ -433,10 +427,7 @@ def cli_encode(args: argparse.Namespace) -> None:
     elif format_version == FORMAT_VERSION_V2:
         encoder = encode_timeseries_v2
     else:
-        raise ValueError(
-            f"Unsupported encode format version "
-            f"{format_version}"
-        )
+        raise ValueError(f"Unsupported encode format version " f"{format_version}")
 
     data = encoder(
         ts,

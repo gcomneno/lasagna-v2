@@ -35,16 +35,10 @@ def _encode_args(
 def _write_linear_csv(
     path: Path,
 ) -> list[float]:
-    values = [
-        1.0 + 0.5 * index
-        for index in range(64)
-    ]
+    values = [1.0 + 0.5 * index for index in range(64)]
 
     path.write_text(
-        "".join(
-            f"{value:.17g}\n"
-            for value in values
-        ),
+        "".join(f"{value:.17g}\n" for value in values),
         encoding="utf-8",
     )
 
@@ -56,18 +50,13 @@ def _read_csv_values(
 ) -> list[float]:
     return [
         float(line)
-        for line in path.read_text(
-            encoding="utf-8"
-        ).splitlines()
+        for line in path.read_text(encoding="utf-8").splitlines()
         if line.strip()
     ]
 
 
 def _version(data: bytes) -> int:
-    return (
-        core.FILE_HEADER_STRUCT
-        .unpack_from(data, 0)[1]
-    )
+    return core.FILE_HEADER_STRUCT.unpack_from(data, 0)[1]
 
 
 def test_encode_parser_defaults_to_v1() -> None:
@@ -87,9 +76,7 @@ def test_encode_parser_defaults_to_v1() -> None:
         ]
     )
 
-    assert args.format_version == (
-        core.FORMAT_VERSION_V1
-    )
+    assert args.format_version == (core.FORMAT_VERSION_V1)
 
 
 def test_encode_parser_accepts_explicit_v2() -> None:
@@ -111,9 +98,7 @@ def test_encode_parser_accepts_explicit_v2() -> None:
         ]
     )
 
-    assert args.format_version == (
-        core.FORMAT_VERSION_V2
-    )
+    assert args.format_version == (core.FORMAT_VERSION_V2)
 
 
 def test_encode_parser_rejects_unknown_version() -> None:
@@ -138,31 +123,19 @@ def test_encode_parser_rejects_unknown_version() -> None:
 
 
 def test_public_api_exports_v2_encoder() -> None:
-    assert (
-        lasagna2.encode_timeseries_v2
-        is core.encode_timeseries_v2
-    )
+    assert lasagna2.encode_timeseries_v2 is core.encode_timeseries_v2
 
-    assert "encode_timeseries_v2" in (
-        lasagna2.__all__
-    )
+    assert "encode_timeseries_v2" in (lasagna2.__all__)
 
-    assert (
-        lasagna2.encode_timeseries
-        is core.encode_timeseries
-    )
+    assert lasagna2.encode_timeseries is core.encode_timeseries
 
 
 def test_cli_v1_default_and_explicit_v1_are_identical(
     tmp_path: Path,
 ) -> None:
     source = tmp_path / "input.csv"
-    default_output = (
-        tmp_path / "default.lsg2"
-    )
-    explicit_output = (
-        tmp_path / "explicit-v1.lsg2"
-    )
+    default_output = tmp_path / "default.lsg2"
+    explicit_output = tmp_path / "explicit-v1.lsg2"
 
     _write_linear_csv(source)
 
@@ -182,22 +155,13 @@ def test_cli_v1_default_and_explicit_v1_are_identical(
         )
     )
 
-    default_bytes = (
-        default_output.read_bytes()
-    )
+    default_bytes = default_output.read_bytes()
 
-    explicit_bytes = (
-        explicit_output.read_bytes()
-    )
+    explicit_bytes = explicit_output.read_bytes()
 
-    assert (
-        default_bytes
-        == explicit_bytes
-    )
+    assert default_bytes == explicit_bytes
 
-    assert _version(
-        default_bytes
-    ) == core.FORMAT_VERSION_V1
+    assert _version(default_bytes) == core.FORMAT_VERSION_V1
 
 
 def test_cli_v2_encode_decode_and_info(
@@ -208,9 +172,7 @@ def test_cli_v2_encode_decode_and_info(
     encoded = tmp_path / "output-v2.lsg2"
     decoded = tmp_path / "decoded.csv"
 
-    original = _write_linear_csv(
-        source
-    )
+    original = _write_linear_csv(source)
 
     cli.main(
         _encode_args(
@@ -223,27 +185,19 @@ def test_cli_v2_encode_decode_and_info(
 
     data = encoded.read_bytes()
 
-    assert _version(data) == (
-        core.FORMAT_VERSION_V2
-    )
+    assert _version(data) == (core.FORMAT_VERSION_V2)
 
     (
         _ctx,
         n_points,
         segments,
         coding_type,
-    ) = (
-        cli.read_lsg2_metadata_and_segments(
-            data
-        )
-    )
+    ) = cli.read_lsg2_metadata_and_segments(data)
 
     assert n_points == 64
     assert len(segments) == 1
 
-    assert coding_type == (
-        core.RESIDUAL_CODEC_VARINT
-    )
+    assert coding_type == (core.RESIDUAL_CODEC_VARINT)
 
     cli.main(
         [
@@ -253,9 +207,7 @@ def test_cli_v2_encode_decode_and_info(
         ]
     )
 
-    reconstructed = (
-        _read_csv_values(decoded)
-    )
+    reconstructed = _read_csv_values(decoded)
 
     assert reconstructed == (
         pytest.approx(
@@ -274,11 +226,7 @@ def test_cli_v2_encode_decode_and_info(
 
     output = capsys.readouterr().out
 
-    assert (
-        "Format      : "
-        "LSG2 (v2 L32, univariate)"
-        in output
-    )
+    assert "Format      : " "LSG2 (v2 L32, univariate)" in output
 
     assert "points    : 64" in output
     assert "segments  : 1" in output
@@ -309,8 +257,4 @@ def test_cli_info_preserves_v1_label(
 
     output = capsys.readouterr().out
 
-    assert (
-        "Format      : "
-        "LSG2 (MVP v1, univariate)"
-        in output
-    )
+    assert "Format      : " "LSG2 (MVP v1, univariate)" in output

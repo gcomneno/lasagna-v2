@@ -61,15 +61,10 @@ def test_benchmark_trend_contains_expected_matrix() -> None:
     assert codecs.count("lasagna") == 10
 
     configurations = {
-        result.configuration
-        for result in results
-        if result.codec == "lasagna"
+        result.configuration for result in results if result.codec == "lasagna"
     }
 
-    assert configurations == {
-        config.name
-        for config in benchmark_codec.LASAGNA_CONFIGS
-    }
+    assert configurations == {config.name for config in benchmark_codec.LASAGNA_CONFIGS}
 
     for result in results:
         assert result.n_samples == 200
