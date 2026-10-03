@@ -1,386 +1,454 @@
 # Lasagna 2 — Time Series Predictive Codec
-> 🍝 **Lasagna 2** è un codec predittivo sperimentale per serie temporali
-> univariate strutturate: combina segmentazione, predizione locale,
-> quantizzazione dei residui e codifica compatta dei residui.
->
-> Il progetto esplora il compromesso **rate–distortion** su segnali localmente
-> prevedibili; non è pensato come sostituto general-purpose di compressori
-> lossless come gzip o zstd.
 
-⚠️ **Stato del progetto:** MVP di ricerca, non ancora pensato per produzione.
-Formato e API possono cambiare senza preavviso.
+[![CI](https://github.com/gcomneno/lasagna-v2/actions/workflows/ci.yml/badge.svg)](https://github.com/gcomneno/lasagna-v2/actions/workflows/ci.yml)
+[![Security](https://github.com/gcomneno/lasagna-v2/actions/workflows/security.yml/badge.svg)](https://github.com/gcomneno/lasagna-v2/actions/workflows/security.yml)
+[![Supply chain](https://github.com/gcomneno/lasagna-v2/actions/workflows/supply-chain.yml/badge.svg)](https://github.com/gcomneno/lasagna-v2/actions/workflows/supply-chain.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
----
+**Segment → predict → quantize → encode residuals.**
 
-## Obiettivi
-Lasagna v2 nasce da tre idee:
+![Lasagna 2 codec overview](docs/assets/lasagna2-codec-overview.png)
 
-1. **Non comprimere solo i bit, ma anche la struttura temporale.**
-   Segmenti “lunghi e tranquilli” vanno trattati in modo diverso da tratti rumorosi
-   o oscillatori.
+Lasagna 2 is an experimental predictive codec for structured, univariate time
+series.
 
-2. **Separare pattern e residuo.**
-   Prima si cattura il pattern principale (trend, flat, oscillazione),
-   poi si impacchetta l’errore con una quantizzazione controllata.
+Instead of treating a signal as an opaque byte stream, it divides the series
+into locally predictable segments, fits a small predictor to each segment, and
+stores quantized prediction errors together with compact model metadata.
 
-3. **Esplorare struttura locale e rappresentazioni compatte.**
-   Il codec usa segmentazione e predittori locali per descrivere la parte
-   prevedibile del segnale e codificare separatamente i residui.
+The project is primarily a **rate-distortion and representation experiment**.
+It is not presented as a universal replacement for general-purpose
+compressors.
 
-   Il framing “brain-inspired” appartiene all'origine concettuale del progetto
-   e non rappresenta un modello neuroscientifico.
-
-Per la parte concettuale vedi anche
-📄 [`docs/manifesto.md`](docs/manifesto.md).
+> **Research status:** experimental, reproducible, and intentionally explicit
+> about its assumptions and limitations.
 
 ---
 
-## Funzionalità principali (MVP v2)
+## Measured V2 result
 
-- **Serie temporali univariate** (`TimeSeries`):
-  - valori float,
-  - `dt` (passo temporale), `t0` (timestamp di inizio), `unit`.
+The current V2 physical layout was selected under a frozen protocol and then
+validated end-to-end on the canonical synthetic corpus.
 
-- **Segmentazione:**
-  - `fixed`: segmenti di lunghezza costante,
-  - `adaptive`: segmenti variabili in base al MSE del modello.
+| Metric | V1 | V2 |
+|---|---:|---:|
+| Segment metadata | 64 B | 32 B |
+| Canonical corpus size | 1,875,150 B | 1,500,750 B |
+| Bits/sample | 18.6027 | 14.8884 |
+| Residual payload | 806,400 B | 806,400 B |
 
-- **Predittori per segmento:**
-  - `mean` — livello costante,
-  - `linear` — retta (trend),
-  - `rw` — random-walk (dipendenza forte dal punto precedente),
-  - `auto` — selezione automatica per segmento (MSE post-decode).
+Observed result:
 
-- **Codifica dei residui:**
-  - `raw` — interi 32 bit,
-  - `varint` — ZigZag + varint (più compatto quando i residui sono piccoli).
+```text
+Cases                         1,575
+Samples                     806,400
+Segments                     11,700
 
-- **Pattern tagging per segmento:**
-  - `patt ∈ {flat, trend, oscillation, noisy}`,
-  - `sal ∈ {0, 1, 2}` (salienza “energetica” del segmento).
+Bytes saved                 374,400
+Corpus reduction             19.9664%
+Bits/sample saved             3.7143
 
-- **Formato binario `.lsg2`:**
-  - header con meta-info (JSON compresso),
-  - tabella segmenti,
-  - sezione residui con blocchi per segmento.
+Residual payload delta             0 B
+Non-metadata wire delta            0 B
 
-### Terminologia sperimentale
+V1 reference identity       1575/1575
+V2 determinism              1575/1575
+```
 
-Le etichette `motif`, `pattern` e `cluster` presenti nell'MVP sono euristiche
-e raggruppamenti rule-based. Non implicano motif discovery statistica,
-clustering statistico o validazione neuroscientifica.
+The full observed saving is exactly accounted for by the segment metadata
+change:
 
+```text
+11,700 segments × (64 B - 32 B)
+= 374,400 B
+```
+
+The aggregate distortion remained effectively unchanged at corpus scale.
+
+See the complete measurements, predictor-level breakdown, provenance, and
+distortion analysis in
+[`docs/v2-empirical-validation.md`](docs/v2-empirical-validation.md).
+
+### What this result does — and does not — claim
+
+It shows that, **on the frozen canonical corpus**, the selected V2 metadata
+layout reduces the physical Lasagna wire size by 19.97% relative to V1 without
+moving that cost into a larger residual payload.
+
+It does **not** establish that Lasagna is universally smaller than gzip, zstd,
+or other general-purpose or domain-specific codecs.
+
+The canonical corpus is synthetic and protocol-controlled. Results on other
+signals depend on signal structure, segmentation, predictor behavior,
+quantization, and residual statistics.
 
 ---
 
-## Installazione
+## Core idea
 
-Consigliato usare una virtualenv.
+If a time series is locally predictable, storing the model plus a small error
+can be more useful than repeatedly storing the original values.
+
+```mermaid
+flowchart LR
+    A[Time series] --> B[Segment]
+    B --> C[Fit local predictor]
+    C --> D[Compute residuals]
+    D --> E[Quantize]
+    E --> F[Encode residuals]
+
+    F --> G[LSG2 stream]
+
+    G --> H[Parse header + segments]
+    H --> I[Decode residuals]
+    I --> J[Reconstruct segments]
+    J --> K[Approximate time series]
+```
+
+The three principal layers of an `.lsg2` stream are:
+
+1. **Global header and context**
+2. **Segment table with predictor metadata**
+3. **Residual section encoded block-by-block**
+
+The guiding design principle is:
+
+> **Model structure only when structure pays for itself.**
+
+---
+
+## Predictors and segmentation
+
+Lasagna currently supports univariate `TimeSeries` data with:
+
+- sample values;
+- sampling interval `dt`;
+- start time `t0`;
+- symbolic unit.
+
+Segmentation modes:
+
+- `fixed` — constant segment length;
+- `adaptive` — segment growth controlled by model error.
+
+Per-segment predictors:
+
+- `mean`;
+- `linear`;
+- `rw` — random walk;
+- `auto` — model selection per segment.
+
+Residual coding currently exposed by the public wire path:
+
+- raw signed int32;
+- ZigZag + varint.
+
+Zero-run residual coding has been explored as a research candidate, but it is
+**not part of the currently implemented public V2 wire path**.
+
+---
+
+## V1 and V2 wire formats
+
+Lasagna intentionally keeps V1 readable while introducing V2 as an explicit
+format.
+
+### V1 — compatibility baseline
+
+V1 stores a 64-byte segment entry:
+
+```text
+<6Iddddd>
+```
+
+The public encoder remains the compatibility default.
+
+### V2 — frozen L32 layout
+
+V2 stores a 32-byte segment entry:
+
+```text
+<IIIfffff>
+```
+
+Fields:
+
+```text
+start_idx       uint32
+end_idx         uint32
+predictor_type  uint32
+
+mean            float32
+slope           float32
+intercept       float32
+quant_step_Q    float32
+seed_value      float32
+```
+
+The V2 layout was not chosen by intuition alone. Candidate layouts were
+evaluated under a frozen protocol, L32 was selected, and the physical layout
+was then sealed before the public encoder/decoder path was implemented.
+
+Unknown wire versions fail closed.
+
+---
+
+## CLI
+
+Install the project in a virtual environment:
 
 ```bash
-git clone https://github.com/<TUO_USER>/lasagna-v2.git
+git clone https://github.com/gcomneno/lasagna-v2.git
 cd lasagna-v2
+
 python3 -m venv .venv
 source .venv/bin/activate
 
-# installa runtime + strumenti di sviluppo
 python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
 ```
 
-La installazione in modalità editable ti dà:
+### Encode using the historical V1 default
 
-- il package `lasagna2`,
-- lo script CLI `lasagna2`,
-- gli strumenti dev (`black`, `ruff`, `pre-commit`, `pytest`, `detect-secrets`, …).
+```bash
+lasagna2 encode \
+  data/examples/trend.csv \
+  /tmp/trend-v1.lsg2 \
+  --dt 1 \
+  --t0 1970-01-01T00:00:00Z \
+  --unit arbitrary \
+  --predictor linear
+```
+
+Equivalent explicit form:
+
+```bash
+lasagna2 encode \
+  data/examples/trend.csv \
+  /tmp/trend-v1.lsg2 \
+  --dt 1 \
+  --t0 1970-01-01T00:00:00Z \
+  --unit arbitrary \
+  --predictor linear \
+  --format-version 1
+```
+
+### Encode using V2
+
+```bash
+lasagna2 encode \
+  data/examples/trend.csv \
+  /tmp/trend-v2.lsg2 \
+  --dt 1 \
+  --t0 1970-01-01T00:00:00Z \
+  --unit arbitrary \
+  --predictor linear \
+  --format-version 2
+```
+
+### Decode
+
+The decoder auto-detects V1 and V2:
+
+```bash
+lasagna2 decode \
+  /tmp/trend-v2.lsg2 \
+  /tmp/trend-decoded.csv
+```
+
+### Inspect
+
+`info` also auto-detects the wire version:
+
+```bash
+lasagna2 info /tmp/trend-v2.lsg2 -v
+```
 
 ---
 
-## Quick demo
+## Python API
 
-Per vedere Lasagna v2 in azione senza dover preparare dati reali, il repo include
-una **demo completa** basata su tre serie sintetiche:
-
-- `trend.csv`        → regime a trend quasi puro
-- `sine_noise.csv`   → sinusoide + trend + rumore
-- `flat_spike.csv`   → plateau con gradino centrale (spike)
-
-La pipeline della demo è:
-
-```text
-CSV → .lsg2 → profiles.csv → events.csv + clusters.csv → PNG
-```
-
-### Esecuzione
-
-Clona il repo, installa il pacchetto (in editable mode) e lancia la demo:
-
-```bash
-git clone https://github.com/…/lasagna-v2.git
-cd lasagna-v2
-
-python -m venv .venv
-source .venv/bin/activate
-
-pip install -e .
-
-make demo
-```
-
-Il target `demo` esegue:
-
-1. generazione dei CSV demo (`data/demo/*.csv`)
-2. encoding in formato binario `.lsg2`
-3. calcolo dei profili (`profiles.csv`)
-4. eventi semantici + cluster (`events.csv`, `clusters.csv`)
-5. export dei tag di segmento (`*_tags.csv`)
-6. generazione delle immagini PNG per `flat_spike`:
-   - `data/demo/flat_spike_tags.segments.png`
-   - `data/demo/flat_spike_tags.energy.png`
-
-Per maggiori dettagli sulla pipeline demo vedi
-[`docs/PIPELINE.md`](docs/PIPELINE.md).
-
-### Use case: sequenze di allarmi (multivalore)
-
-La demo include anche un caso d’uso per **sequenze di allarmi** (eventi con
-più attributi per riga: `timestamp`, `type`, `severity`).
-
-Il flusso è:
-
-```text
-alarms.csv → alarms_intensity.csv → alarms_intensity.lsg2 → profiles/events/clusters
-```
-
-In particolare:
-
-- `tools/generate_fake_alarms.py` genera un log sintetico di allarmi:
-  `data/demo/alarms.csv`.
-- `tools/prep_alarms.py` converte il log multivalore in una serie univariata
-  di intensità allarmi: `data/demo/alarms_intensity.csv`.
-- `make demo` si occupa di encodare anche `alarms_intensity.lsg2` e
-  includerlo automaticamente in `profiles.csv`, `events.csv` e `clusters.csv`.
-
-
----
-## Quickstart
-
-### 1. Esempio `trend` (CSV → LSG2 → CSV)
-
-Encode (trend sintetico con errore di ricostruzione prossimo a zero):
-
-```bash
-lasagna2 encode   --dt 1   --t0 0   --unit step   data/examples/trend.csv   data/tmp/trend.lsg2
-```
-
-Ispeziona il file `.lsg2`:
-
-```bash
-lasagna2 info data/tmp/trend.lsg2 -v
-```
-
-Output tipico (estratto):
-
-```text
-Time series :
-  points    : 200
-  dt        : 60.0 s
-  t0        : 2025-01-01T00:00:00Z
-  unit      : kW
-  segments  : 3
-
-Segments overview:
-  id  start   end   len  pred  patt  sal   mean        slope       Q
-  --- ------- ----- ---- ----- ----- --- ----------- ----------- -----------
-    0       0    79   80 linear trend  2    3.950000    0.100000       1e-06
-    1      80   159   80 linear trend  2   11.950000    0.100000       1e-06
-    2     160   199   40 linear trend  1   17.950001    0.100000       1e-06
-```
-
-Decode:
-
-```bash
-lasagna2 decode   data/tmp/trend.lsg2   data/tmp/trend_decoded.csv
-```
-
-Il file CSV risultante contiene l’header `# value` e 200 valori ricostruiti, uno per riga.
-
----
-
-### 2. Esempio `sine_noise` (codec lossy controllato)
-
-Encode (sinusoide + rumore, con soglia MSE più alta):
-
-```bash
-lasagna2 encode   --dt 1   --t0 0   --unit step   data/examples/sine_noise.csv   data/tmp/sine_noise.lsg2
-```
-
-Decode:
-
-```bash
-lasagna2 decode   data/tmp/sine_noise.lsg2   data/tmp/sine_noise_decoded.csv
-```
-
-In questo caso il codec è intenzionalmente **lossy**: la serie ricostruita ha la stessa lunghezza e la stessa forma globale,
-ma i valori non coincidono esattamente punto per punto (RMSE moderata).
-
----
-
-## Utilizzo da codice Python
+V1 remains the compatibility-default encoder:
 
 ```python
-from pathlib import Path
-from lasagna2 import TimeSeries, encode_timeseries, decode_timeseries
+from lasagna2 import TimeSeries, decode_timeseries, encode_timeseries
 
-# Costruisci una piccola serie
-values = [0.1 * i for i in range(200)]
 ts = TimeSeries(
-    values=values,
-    dt=60.0,
-    t0="2025-01-01T00:00:00Z",
-    unit="kW",
+    values=[0.1 * i for i in range(200)],
+    dt=1.0,
+    t0="1970-01-01T00:00:00Z",
+    unit="arbitrary",
 )
 
-# Encode in memoria
-encoded = encode_timeseries(
+encoded_v1 = encode_timeseries(
     ts,
-    segment_mode="adaptive",
-    min_segment_length=30,
-    max_segment_length=80,
-    mse_threshold=0.01,
-    predictor="auto",
-    residual_coding="varint",
+    predictor="linear",
 )
 
-Path("trend.lsg2").write_bytes(encoded)
-
-# Decode
-decoded = decode_timeseries(encoded)
-print(len(decoded.values), decoded.dt, decoded.unit)
+decoded = decode_timeseries(encoded_v1)
 ```
 
-### Esportare i tag dei segmenti
+V2 is explicit:
 
-```bash
-lasagna2 export-tags data/tmp/trend.lsg2 data/tmp/trend_tags.csv
-head data/tmp/trend_tags.csv
+```python
+from lasagna2 import TimeSeries, decode_timeseries, encode_timeseries_v2
+
+ts = TimeSeries(
+    values=[0.1 * i for i in range(200)],
+    dt=1.0,
+    t0="1970-01-01T00:00:00Z",
+    unit="arbitrary",
+)
+
+encoded_v2 = encode_timeseries_v2(
+    ts,
+    predictor="linear",
+)
+
+decoded = decode_timeseries(encoded_v2)
 ```
 
-Output:
-```bash
-seg_id,start,end,len,pred,patt,sal,energy,mean,slope,Q
-0,0,63,64,linear,trend,2,6.40006,3.15,0.1,1e-06
-```
+`decode_timeseries()` accepts both supported wire versions.
 
 ---
 
-## Struttura del progetto
+## Evidence-first development
 
-```bash
-lasagna-v2/
-  lasagna2/
-    __init__.py        # API pubblica (TimeSeries, encode_timeseries, decode_timeseries)
-    core.py            # motore del codec (formato .lsg2, segmentazione, predittori, quantizzazione)
-    cli.py             # implementazione CLI
+The V2 physical format followed a deliberately staged validation cycle:
 
-  lasagna_mvp.py       # wrapper CLI compatibile: python lasagna_mvp.py ...
-
-  data/
-    examples/          # esempi di serie (trend, sin+noise, ...)
-
-  docs/
-    manifesto.md       # framing storico/conceptual “brain-inspired”
-    examples-trend-sine.md
-
-  tests/
-    test_core_roundtrip.py
-    test_cli_encode_decode_info.py
-    test_decode_malicious.py
-
-  .github/workflows/
-    ci.yml             # lint + test (runner hardened)
-    security.yml       # CodeQL, dependency-review
-    supply-chain.yml   # Scorecard, pip-audit
-
-  pyproject.toml
-  requirements-dev.txt
-  .pre-commit-config.yaml
-  .secrets.baseline
-  LICENSE
-  README.md
+```text
+candidate study
+    ↓
+frozen evaluation protocol
+    ↓
+canonical corpus
+    ↓
+candidate evaluation
+    ↓
+L32 selection
+    ↓
+physical freeze
+    ↓
+wire implementation
+    ↓
+public API / CLI
+    ↓
+empirical validation
 ```
 
----
+Current state:
 
-## Strumenti ausiliari (`tools/`)
-Nella cartella `tools/` trovi alcuni script di supporto:
+```text
+Protocol revision             2.1
+M2.3 winner                   L32
+M2.3 selection                CLOSED
+M2.4 physical layout          <IIIfffff>
+M2.4 segment entry            32 bytes
+M2.4 freeze                   SEALED
 
-- `batch_profile.py`
-  Profilazione semantica batch di file `.lsg2`:
-  ```bash
-  python tools/batch_profile.py data/tmp -o data/tmp/profiles.csv
-  ```
+V2 wire encoder               implemented
+V2 wire decoder               implemented
+Public V2 API                 exposed
+Public V2 CLI                 exposed
+Empirical validation          PASS
+```
 
-- `lasagna_viewer.py`
-  Visualizza i segmenti (output di `lasagna2 export-tags`) con grafici semplici:
-  ```bash
-  python tools/lasagna_viewer.py data/tmp/sine_noise_tags.csv
-  ```
-
-- `semantic_events.py`
-  Estrae “eventi” semantici da un `profiles.csv`:
-  ```bash
-  python tools/semantic_events.py data/tmp/profiles.csv data/tmp/events.csv
-  ```
-
-- `cluster_profiles.py`
-  Aggiunge una colonna `cluster` a `profiles.csv`:
-  ```bash
-  python tools/cluster_profiles.py data/tmp/profiles.csv data/tmp/clusters.csv
-  ```
-
-- `generate_fake_alarms.py`
-  Genera un log sintetico di allarmi multivalore per la demo:
-  ```bash
-  python tools/generate_fake_alarms.py data/demo/alarms.csv
-  ```
-
-- `prep_alarms.py`
-  Converte un log di allarmi (`timestamp,type,severity`) in una serie univariata
-  di intensità allarmi compatibile con `lasagna2 encode`:
-  ```bash
-  python tools/prep_alarms.py data/demo/alarms.csv data/demo/alarms_intensity.csv --dt 60
-  ```
+The implementation does not retroactively rewrite the experiment that selected
+the layout.
 
 ---
 
-## Qualità & Sicurezza
+## Reproducibility and evidence
 
-- **Pre-commit**:
-  - `black`, `ruff`, `detect-secrets`, controlli standard su YAML / whitespace / file grossi.
-- **Test**:
-  - roundtrip encode/decode su serie sintetiche,
-  - CLI encode/info/decode,
-  - test su file `.lsg2` corrotti / malevoli (decode deve fallire con `ValueError` e non esplodere).
-- **CI (GitHub Actions)**:
-  - runner hardened con egress policy e allowlist stretta,
-  - actions pinmate a SHA,
-  - `pre-commit` + `pytest` su ogni push/PR.
-- **Security pipeline**:
-  - CodeQL per Python,
-  - dependency-review su PR,
-  - pip-audit sulle dipendenze dev,
-  - OpenSSF Scorecard periodico.
+Key documents:
+
+- [`docs/rate-distortion-design.md`](docs/rate-distortion-design.md) —
+  frozen experimental method and revision history;
+- [`docs/m2-3-evidence.md`](docs/m2-3-evidence.md) —
+  candidate evaluation evidence;
+- [`docs/v2-empirical-validation.md`](docs/v2-empirical-validation.md) —
+  end-to-end V1 vs V2 corpus validation;
+- [`docs/manifesto.md`](docs/manifesto.md) —
+  original conceptual motivation.
+
+The empirical-validation document records the canonical identities used for
+the final V1/V2 comparison.
 
 ---
 
-## Roadmap
-MVP attuale copre **solo univariato**.
-Idee per le prossime iterazioni:
-- supporto multivariato (più serie correlate),
-- pattern tagging più ricco (eventualmente supervisionato),
-- livelli di “profilo” (`--profile=human`, `--profile=machine`),
-- strumenti di visualizzazione per segmenti, residui e pattern,
-- specifica del formato `.lsg2` più formale / “da paper”.
+## Testing and safety
 
-Contributi, discussioni e idee sono benvenuti, ma il progetto resta dichiaratamente sperimentale.
+The current test suite covers:
+
+- core encode/decode behavior;
+- V1 compatibility;
+- V2 wire round-trips;
+- physical L32 byte layout;
+- CLI V1/V2 encode/decode/info;
+- unsupported-version fail-closed behavior;
+- malformed or hostile inputs.
+
+The repository also contains GitHub Actions workflows for:
+
+- CI;
+- CodeQL and dependency review;
+- pip audit;
+- OpenSSF Scorecard;
+- hardened runners.
+
+The scientific validation cycle was closed with **42 passing tests** at the
+validated implementation state.
+
+---
+
+## Limitations
+
+Lasagna 2 is research software.
+
+Current boundaries include:
+
+- univariate time series only;
+- lossy reconstruction when quantization is active;
+- synthetic canonical validation corpus;
+- no claim of universal compression superiority;
+- no stability guarantee for future protocol revisions;
+- not intended as a production archival format at this stage.
+
+The V2 result should be interpreted as a controlled comparison against the
+project's V1 baseline, not as a benchmark over the full time-series compression
+literature.
+
+---
+
+## Project philosophy
+
+A few principles guide the work:
+
+- **Evidence before claims**
+- **Freeze methodology before reading the result**
+- **A benchmark may eliminate candidates; it must never invent the rule that
+  selects them**
+- **Model structure only when structure pays for itself**
+- **Compatibility changes are explicit**
+- **Unknown formats fail closed**
+
+The project started from a "brain-inspired" intuition — segment, predict, keep
+the surprise — but the current work is framed as an engineering and
+rate-distortion experiment rather than a neuroscience claim.
+
+---
+
+## Contributing
+
+Contributions and technically grounded discussion are welcome.
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
+When changing public codec behavior, please include tests and update the
+relevant format or evidence documentation.
+
+---
+
+## License
+
+MIT. See [`LICENSE`](LICENSE).
