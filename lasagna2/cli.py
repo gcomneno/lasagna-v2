@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import os
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
@@ -12,17 +13,39 @@ from .core import (
     FORMAT_VERSION_V1,
     FORMAT_VERSION_V2,
     FILE_HEADER_STRUCT,
+    MAX_INPUT_BYTES,
     RESIDUAL_SECTION_HEADER_STRUCT,
     SEGMENT_ENTRY_STRUCT,
     SEGMENT_ENTRY_V2_STRUCT,
     SegmentEntry,
     TimeSeries,
+    _preflight_lsg2,
     decode_timeseries,
     encode_timeseries_v1,
     encode_timeseries_v2,
 )
 
 import json
+
+
+def _read_lsg2_bounded(path: Path) -> bytes:
+    """
+    Read a whole LSG2 file without allowing an oversized pre-validation read.
+    """
+    with path.open("rb") as handle:
+        reported_size = os.fstat(handle.fileno()).st_size
+
+        if reported_size > MAX_INPUT_BYTES:
+            raise ValueError(
+                "LSG2 input exceeds maximum size " f"{MAX_INPUT_BYTES} bytes"
+            )
+
+        data = handle.read(MAX_INPUT_BYTES + 1)
+
+    if len(data) > MAX_INPUT_BYTES:
+        raise ValueError("LSG2 input exceeds maximum size " f"{MAX_INPUT_BYTES} bytes")
+
+    return data
 
 
 # ---------------------------------------------------------------------------
@@ -185,6 +208,8 @@ def read_lsg2_metadata_and_segments(
     Legge header + context JSON + tabella segmenti + header sezione residui.
     Non decodifica i blocchi di residui.
     """
+    _preflight_lsg2(data)
+
     offset = 0
     if len(data) < FILE_HEADER_STRUCT.size:
         raise ValueError("Data too short to contain header")
@@ -456,14 +481,14 @@ def cli_decode(args: argparse.Namespace) -> None:
     input_path = Path(args.input)
     output_path = Path(args.output)
 
-    data = input_path.read_bytes()
+    data = _read_lsg2_bounded(input_path)
     ts = decode_timeseries(data)
     save_timeseries_to_csv(ts, output_path)
 
 
 def cli_info(args: argparse.Namespace) -> None:
     input_path = Path(args.input)
-    data = input_path.read_bytes()
+    data = _read_lsg2_bounded(input_path)
 
     ctx, n_points, segments, coding_type = read_lsg2_metadata_and_segments(data)
 
@@ -607,7 +632,7 @@ def cli_info(args: argparse.Namespace) -> None:
 def cli_export_tags(args: argparse.Namespace) -> None:
     input_path = Path(args.input)
     output_path = Path(args.output)
-    data = input_path.read_bytes()
+    data = _read_lsg2_bounded(input_path)
     ctx, n_points, segments, coding_type = read_lsg2_metadata_and_segments(data)
 
     predictor_names = {
@@ -659,7 +684,7 @@ def cli_export_tags(args: argparse.Namespace) -> None:
 def cli_export_motifs(args: argparse.Namespace) -> None:
     input_path = Path(args.input)
     output_path = Path(args.output)
-    data = input_path.read_bytes()
+    data = _read_lsg2_bounded(input_path)
     ctx, n_points, segments, coding_type = read_lsg2_metadata_and_segments(data)
     motifs = extract_motifs(segments)
 
@@ -695,7 +720,7 @@ def cli_export_profile(args: argparse.Namespace) -> None:
     input_path = Path(args.input)
     output_path = Path(args.output)
 
-    data = input_path.read_bytes()
+    data = _read_lsg2_bounded(input_path)
     ctx, n_points, segments, coding_type = read_lsg2_metadata_and_segments(data)
 
     # meta base

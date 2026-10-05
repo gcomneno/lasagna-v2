@@ -226,6 +226,328 @@ RESIDUAL_SECTION_HEADER_STRUCT = struct.Struct("<IIII")
 # byte_len (I)
 RESIDUAL_BLOCK_HEADER_STRUCT = struct.Struct("<III")
 
+# ---------------------------------------------------------------------------
+# Production resource limits
+# ---------------------------------------------------------------------------
+UINT32_MAX = (1 << 32) - 1
+
+MAX_POINTS = 10_000_000
+MAX_SEGMENTS = 1_000_000
+MAX_SEGMENT_POINTS = MAX_POINTS
+
+MAX_CONTEXT_BYTES = 65_536
+MAX_CONTEXT_DEPTH = 64
+MAX_VARINT_BYTES = 10
+
+MAX_RESIDUAL_BLOCK_BYTES = MAX_VARINT_BYTES * MAX_SEGMENT_POINTS
+
+MAX_INPUT_BYTES = (
+    FILE_HEADER_STRUCT.size
+    + MAX_CONTEXT_BYTES
+    + (SEGMENT_ENTRY_STRUCT.size + RESIDUAL_BLOCK_HEADER_STRUCT.size) * MAX_SEGMENTS
+    + MAX_VARINT_BYTES * MAX_POINTS
+    + RESIDUAL_SECTION_HEADER_STRUCT.size
+)
+
+
+def _validate_context_depth(data: bytes) -> None:
+    """Reject pathological JSON nesting before handing bytes to json.loads()."""
+    depth = 0
+    in_string = False
+    escaped = False
+
+    for byte in data:
+        if in_string:
+            if escaped:
+                escaped = False
+            elif byte == 0x5C:  # backslash
+                escaped = True
+            elif byte == 0x22:  # double quote
+                in_string = False
+            continue
+
+        if byte == 0x22:
+            in_string = True
+            continue
+
+        if byte in (0x7B, 0x5B):  # { [
+            depth += 1
+            if depth > MAX_CONTEXT_DEPTH:
+                raise ValueError(
+                    "Context JSON exceeds maximum nesting depth " f"{MAX_CONTEXT_DEPTH}"
+                )
+        elif byte in (0x7D, 0x5D):  # } ]
+            if depth > 0:
+                depth -= 1
+
+
+def _validate_context_bytes(data: bytes) -> None:
+    if len(data) > MAX_CONTEXT_BYTES:
+        raise ValueError(
+            "Context JSON exceeds maximum size " f"{MAX_CONTEXT_BYTES} bytes"
+        )
+
+    _validate_context_depth(data)
+
+
+def _validate_input_size(data: bytes) -> None:
+    if len(data) > MAX_INPUT_BYTES:
+        raise ValueError("LSG2 input exceeds maximum size " f"{MAX_INPUT_BYTES} bytes")
+
+
+def _validate_header_resources(
+    *,
+    header_len: int,
+    n_points: int,
+    n_segments: int,
+) -> None:
+    if n_points > MAX_POINTS:
+        raise ValueError(f"n_points={n_points} exceeds maximum {MAX_POINTS}")
+
+    if n_segments > MAX_SEGMENTS:
+        raise ValueError(f"n_segments={n_segments} exceeds maximum {MAX_SEGMENTS}")
+
+    if header_len > MAX_CONTEXT_BYTES:
+        raise ValueError(
+            "Context JSON exceeds maximum size " f"{MAX_CONTEXT_BYTES} bytes"
+        )
+
+
+def _preflight_lsg2(data: bytes) -> None:
+    """
+    Validate resource-bearing LSG2 structure before decoder amplification.
+
+    This check intentionally preserves frozen V1/V2 wire semantics. It bounds
+    work and allocation but does not reinterpret valid predictor semantics.
+    """
+    _validate_input_size(data)
+
+    if len(data) < FILE_HEADER_STRUCT.size:
+        raise ValueError("Data too short to contain header")
+
+    (
+        magic,
+        version,
+        _flags,
+        header_len,
+        n_points,
+        n_segments,
+        _reserved1,
+        _reserved2,
+    ) = FILE_HEADER_STRUCT.unpack_from(data, 0)
+
+    if magic != b"LSG2":
+        raise ValueError("Invalid magic, not an LSG2 file")
+
+    if version not in (
+        FORMAT_VERSION_V1,
+        FORMAT_VERSION_V2,
+    ):
+        raise ValueError(
+            f"Unsupported LSG2 version {version}; " "supported versions are 1 and 2"
+        )
+
+    _validate_header_resources(
+        header_len=header_len,
+        n_points=n_points,
+        n_segments=n_segments,
+    )
+
+    offset = FILE_HEADER_STRUCT.size
+    context_end = offset + header_len
+
+    if context_end > len(data):
+        raise ValueError("Data too short for context JSON")
+
+    context_bytes = data[offset:context_end]
+    _validate_context_bytes(context_bytes)
+    offset = context_end
+
+    if version == FORMAT_VERSION_V1:
+        segment_struct = SEGMENT_ENTRY_STRUCT
+    else:
+        segment_struct = SEGMENT_ENTRY_V2_STRUCT
+
+    segment_table_bytes = n_segments * segment_struct.size
+    segment_table_end = offset + segment_table_bytes
+
+    if segment_table_end > len(data):
+        raise ValueError("Data too short for segment table")
+
+    segment_lengths: list[int] = []
+    total_segment_samples = 0
+    expected_v2_start = 0
+
+    for _ in range(n_segments):
+        if version == FORMAT_VERSION_V1:
+            (
+                start_idx,
+                end_idx,
+                predictor_type,
+                _pad1,
+                _pad2,
+                _pad3,
+                _mean,
+                _slope,
+                _intercept,
+                _Q,
+                _seed_value,
+            ) = SEGMENT_ENTRY_STRUCT.unpack_from(
+                data,
+                offset,
+            )
+        else:
+            (
+                start_idx,
+                end_idx,
+                predictor_type,
+                _mean,
+                _slope,
+                _intercept,
+                _Q,
+                _seed_value,
+            ) = SEGMENT_ENTRY_V2_STRUCT.unpack_from(
+                data,
+                offset,
+            )
+
+        offset += segment_struct.size
+
+        if predictor_type not in (0, 1, 2):
+            raise ValueError(f"Unsupported predictor_type {predictor_type}")
+
+        if end_idx < start_idx:
+            raise ValueError("Invalid segment extent")
+
+        if n_points == 0 or end_idx >= n_points:
+            raise ValueError("Segment extent exceeds declared point count")
+
+        length = end_idx - start_idx + 1
+
+        if length > MAX_SEGMENT_POINTS:
+            raise ValueError("Segment length exceeds maximum " f"{MAX_SEGMENT_POINTS}")
+
+        total_segment_samples += length
+
+        if total_segment_samples > MAX_POINTS:
+            raise ValueError(
+                "Aggregate segment sample count exceeds maximum " f"{MAX_POINTS}"
+            )
+
+        if version == FORMAT_VERSION_V2:
+            if start_idx != expected_v2_start:
+                raise ValueError("Non-contiguous V2 segment table")
+            expected_v2_start = end_idx + 1
+
+        segment_lengths.append(length)
+
+    if version == FORMAT_VERSION_V2:
+        if n_segments == 0 and n_points != 0:
+            raise ValueError("Non-empty V2 series has no segments")
+
+        if n_segments and expected_v2_start != n_points:
+            raise ValueError(
+                "V2 segment table does not cover " "the declared point count"
+            )
+
+    residual_header_end = offset + RESIDUAL_SECTION_HEADER_STRUCT.size
+
+    if residual_header_end > len(data):
+        raise ValueError("Data too short for residual section header")
+
+    (
+        coding_type,
+        _res1,
+        _res2,
+        _res3,
+    ) = RESIDUAL_SECTION_HEADER_STRUCT.unpack_from(
+        data,
+        offset,
+    )
+
+    offset = residual_header_end
+
+    if coding_type not in (
+        RESIDUAL_CODEC_RAW_INT32,
+        RESIDUAL_CODEC_VARINT,
+        RESIDUAL_CODEC_ZERO_RUN_VARINT,
+    ):
+        raise ValueError(f"Unsupported coding_type {coding_type} in decoder")
+
+    seen_segment_ids: set[int] = set()
+    total_residual_samples = 0
+
+    for _ in range(n_segments):
+        block_header_end = offset + RESIDUAL_BLOCK_HEADER_STRUCT.size
+
+        if block_header_end > len(data):
+            raise ValueError("Data too short for residual block header")
+
+        (
+            seg_id,
+            seg_len,
+            byte_len,
+        ) = RESIDUAL_BLOCK_HEADER_STRUCT.unpack_from(
+            data,
+            offset,
+        )
+
+        offset = block_header_end
+
+        if seg_id >= n_segments:
+            raise ValueError(f"Invalid seg_id {seg_id} in residual block")
+
+        if seg_id in seen_segment_ids:
+            raise ValueError(f"Duplicate residual block for seg_id={seg_id}")
+
+        seen_segment_ids.add(seg_id)
+
+        expected_length = segment_lengths[seg_id]
+
+        if seg_len != expected_length:
+            raise ValueError(
+                "Residual sample count does not match "
+                f"segment length for seg_id={seg_id}"
+            )
+
+        if seg_len > MAX_SEGMENT_POINTS:
+            raise ValueError(
+                "Residual sample count exceeds maximum " f"{MAX_SEGMENT_POINTS}"
+            )
+
+        total_residual_samples += seg_len
+
+        if total_residual_samples > MAX_POINTS:
+            raise ValueError(
+                "Aggregate residual sample count exceeds maximum " f"{MAX_POINTS}"
+            )
+
+        if byte_len > MAX_RESIDUAL_BLOCK_BYTES:
+            raise ValueError(
+                "Residual block exceeds maximum size "
+                f"{MAX_RESIDUAL_BLOCK_BYTES} bytes"
+            )
+
+        if coding_type == RESIDUAL_CODEC_RAW_INT32 and byte_len != seg_len * 4:
+            raise ValueError("byte_len != seg_len * 4 for raw residuals")
+
+        block_end = offset + byte_len
+
+        if block_end > len(data):
+            raise ValueError("Data too short for residual block data")
+
+        offset = block_end
+
+    if len(seen_segment_ids) != n_segments:
+        raise ValueError("Missing residual block")
+
+
+def _validate_encoded_size(size: int) -> None:
+    if size > MAX_INPUT_BYTES:
+        raise ValueError(
+            "Encoded LSG2 output exceeds maximum size " f"{MAX_INPUT_BYTES} bytes"
+        )
+
 
 # ---------------------------------------------------------------------------
 # Varint / ZigZag helpers
@@ -246,6 +568,11 @@ def _encode_varint(value: int) -> bytes:
         raise ValueError("varint expects non-negative integers")
     out = bytearray()
     while True:
+        if len(out) >= MAX_VARINT_BYTES:
+            raise ValueError(
+                "Varint exceeds maximum encoded length " f"{MAX_VARINT_BYTES} bytes"
+            )
+
         to_write = value & 0x7F
         value >>= 7
         if value:
@@ -310,10 +637,7 @@ def encode_int_list_zero_run_varint(values: List[int]) -> bytes:
         if values[index] == 0:
             run_end = index + 1
 
-            while (
-                run_end < len(values)
-                and values[run_end] == 0
-            ):
+            while run_end < len(values) and values[run_end] == 0:
                 run_end += 1
 
             run_length = run_end - index
@@ -352,30 +676,20 @@ def decode_int_list_zero_run_varint(
             )
 
             if run_length < ZERO_RUN_MIN_LENGTH:
-                raise ValueError(
-                    "Invalid zero-run length"
-                )
+                raise ValueError("Invalid zero-run length")
 
             if len(out) + run_length > length:
-                raise ValueError(
-                    "Zero-run exceeds declared residual count"
-                )
+                raise ValueError("Zero-run exceeds declared residual count")
 
             out.extend([0] * run_length)
         else:
-            out.append(
-                zigzag_decode(token - 1)
-            )
+            out.append(zigzag_decode(token - 1))
 
             if len(out) > length:
-                raise ValueError(
-                    "Decoded residual count exceeds declaration"
-                )
+                raise ValueError("Decoded residual count exceeds declaration")
 
     if len(out) != length:
-        raise ValueError(
-            "Decoded residual count does not match declaration"
-        )
+        raise ValueError("Decoded residual count does not match declaration")
 
     return out
 
@@ -471,6 +785,12 @@ def segment_series_fixed_length(
     """
     if segment_length <= 0:
         raise ValueError("segment_length must be > 0")
+
+    segment_count = (n_points + segment_length - 1) // segment_length if n_points else 0
+
+    if segment_count > MAX_SEGMENTS:
+        raise ValueError("Segment count exceeds maximum " f"{MAX_SEGMENTS}")
+
     segments: List[Tuple[int, int]] = []
     start = 0
     while start < n_points:
@@ -551,6 +871,9 @@ def segment_series_adaptive(
             # se MSE supera soglia o abbiamo raggiunto max_len / fine serie
             break
 
+        if len(segments) >= MAX_SEGMENTS:
+            raise ValueError("Segment count exceeds maximum " f"{MAX_SEGMENTS}")
+
         segments.append((start, best_end))
         i = best_end + 1
 
@@ -561,6 +884,13 @@ def segment_series_adaptive(
 # Context JSON
 # ---------------------------------------------------------------------------
 def build_context_json(ts: TimeSeries) -> bytes:
+    for name, value in (
+        ("t0", str(ts.t0)),
+        ("unit", str(ts.unit)),
+    ):
+        if len(value.encode("utf-8")) > MAX_CONTEXT_BYTES:
+            raise ValueError(f"Context field {name} exceeds resource limit")
+
     ctx = {
         "sampling": {
             "dt": ts.dt,
@@ -568,7 +898,26 @@ def build_context_json(ts: TimeSeries) -> bytes:
         },
         "unit": ts.unit,
     }
-    return json.dumps(ctx, separators=(",", ":")).encode("utf-8")
+
+    encoder = json.JSONEncoder(
+        separators=(",", ":"),
+    )
+
+    out = bytearray()
+
+    for chunk in encoder.iterencode(ctx):
+        encoded = chunk.encode("utf-8")
+
+        if len(out) + len(encoded) > MAX_CONTEXT_BYTES:
+            raise ValueError(
+                "Context JSON exceeds maximum size " f"{MAX_CONTEXT_BYTES} bytes"
+            )
+
+        out.extend(encoded)
+
+    result = bytes(out)
+    _validate_context_depth(result)
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -598,6 +947,9 @@ def _build_encoding_model(
 
     if n_points == 0:
         raise ValueError("TimeSeries is empty")
+
+    if n_points > MAX_POINTS:
+        raise ValueError(f"n_points={n_points} exceeds maximum {MAX_POINTS}")
 
     predictor_map = {
         "mean": 0,
@@ -632,9 +984,7 @@ def _build_encoding_model(
             mse_threshold=mse_threshold,
         )
     else:
-        raise ValueError(
-            "segment_mode must be 'fixed' or 'adaptive'"
-        )
+        raise ValueError("segment_mode must be 'fixed' or 'adaptive'")
 
     segments: list[SegmentEntry] = []
     q_resid_segments: list[list[int]] = []
@@ -678,29 +1028,18 @@ def _build_encoding_model(
 
                 if cand_type in (0, 1):
                     for index in range(length):
-                        x_hat_c[index] = (
-                            preds_c[index]
-                            + q_res_c[index] * Q_c
-                        )
+                        x_hat_c[index] = preds_c[index] + q_res_c[index] * Q_c
                 else:
                     if length > 0:
                         preds_dec = [0.0] * length
                         preds_dec[0] = seed_value
 
-                        x_hat_c[0] = (
-                            preds_dec[0]
-                            + q_res_c[0] * Q_c
-                        )
+                        x_hat_c[0] = preds_dec[0] + q_res_c[0] * Q_c
 
                         for index in range(1, length):
-                            preds_dec[index] = (
-                                x_hat_c[index - 1]
-                            )
+                            preds_dec[index] = x_hat_c[index - 1]
 
-                            x_hat_c[index] = (
-                                preds_dec[index]
-                                + q_res_c[index] * Q_c
-                            )
+                            x_hat_c[index] = preds_dec[index] + q_res_c[index] * Q_c
 
                 if length > 0:
                     mse_c = (
@@ -843,15 +1182,42 @@ def encode_timeseries_v1(
             seg.seed_value,
         )
 
+    encoded_payloads: list[bytes] | None
+
     if residual_coding == "raw":
         coding_type = RESIDUAL_CODEC_RAW_INT32
+        encoded_payloads = None
+        payload_bytes = sum(len(q_res) * 4 for q_res in q_resid_segments)
     elif residual_coding == "varint":
         coding_type = RESIDUAL_CODEC_VARINT
+        encoded_payloads = [encode_int_list_varint(q_res) for q_res in q_resid_segments]
+        payload_bytes = sum(len(payload) for payload in encoded_payloads)
     else:
         raise ValueError(
             f"Unknown residual_coding '{residual_coding}', "
             "expected 'raw' or 'varint'"
         )
+
+    for q_res in q_resid_segments:
+        if len(q_res) > MAX_SEGMENT_POINTS:
+            raise ValueError("Segment length exceeds maximum " f"{MAX_SEGMENT_POINTS}")
+
+    for payload in encoded_payloads or []:
+        if len(payload) > MAX_RESIDUAL_BLOCK_BYTES:
+            raise ValueError(
+                "Residual block exceeds maximum size "
+                f"{MAX_RESIDUAL_BLOCK_BYTES} bytes"
+            )
+
+    encoded_size = (
+        FILE_HEADER_STRUCT.size
+        + len(ctx_bytes)
+        + n_segments * SEGMENT_ENTRY_STRUCT.size
+        + RESIDUAL_SECTION_HEADER_STRUCT.size
+        + n_segments * RESIDUAL_BLOCK_HEADER_STRUCT.size
+        + payload_bytes
+    )
+    _validate_encoded_size(encoded_size)
 
     buf += RESIDUAL_SECTION_HEADER_STRUCT.pack(
         coding_type,
@@ -860,9 +1226,7 @@ def encode_timeseries_v1(
         0,
     )
 
-    for seg_id, q_res in enumerate(
-        q_resid_segments
-    ):
+    for seg_id, q_res in enumerate(q_resid_segments):
         seg_len = len(q_res)
 
         if coding_type == RESIDUAL_CODEC_RAW_INT32:
@@ -880,7 +1244,8 @@ def encode_timeseries_v1(
                     *q_res,
                 )
         else:
-            payload = encode_int_list_varint(q_res)
+            assert encoded_payloads is not None
+            payload = encoded_payloads[seg_id]
 
             buf += RESIDUAL_BLOCK_HEADER_STRUCT.pack(
                 seg_id,
@@ -983,9 +1348,7 @@ def decode_timeseries(data: bytes) -> TimeSeries:
         RESIDUAL_CODEC_VARINT,
         RESIDUAL_CODEC_ZERO_RUN_VARINT,
     ):
-        raise ValueError(
-            f"Unsupported coding_type {coding_type} in decoder"
-        )
+        raise ValueError(f"Unsupported coding_type {coding_type} in decoder")
 
     # Residual blocks
     q_res_segments: List[List[int]] = [[] for _ in range(n_segments)]
@@ -1009,9 +1372,7 @@ def decode_timeseries(data: bytes) -> TimeSeries:
 
         if coding_type == RESIDUAL_CODEC_RAW_INT32:
             if seg_len * 4 != byte_len:
-                raise ValueError(
-                    "byte_len != seg_len * 4 for raw residuals"
-                )
+                raise ValueError("byte_len != seg_len * 4 for raw residuals")
             if seg_len > 0:
                 q_res = list(
                     struct.unpack(
@@ -1072,6 +1433,7 @@ def decode_timeseries(data: bytes) -> TimeSeries:
 
     return TimeSeries(values=x_hat, dt=dt, t0=t0, unit=unit)
 
+
 # ---------------------------------------------------------------------------
 # Version 2 frozen L32 wire path
 # ---------------------------------------------------------------------------
@@ -1130,19 +1492,13 @@ def _round_segment_entry_v2(seg: SegmentEntry) -> SegmentEntry:
     )
 
     if any(not math.isfinite(value) for value in real_values):
-        raise ValueError(
-            "V2 segment metadata must be finite"
-        )
+        raise ValueError("V2 segment metadata must be finite")
 
     if not math.isfinite(quant_step_Q) or quant_step_Q <= 0.0:
-        raise ValueError(
-            "V2 quantization step Q must be finite and > 0"
-        )
+        raise ValueError("V2 quantization step Q must be finite and > 0")
 
     if predictor_type not in (0, 1, 2):
-        raise ValueError(
-            f"Unsupported V2 predictor_type {predictor_type}"
-        )
+        raise ValueError(f"Unsupported V2 predictor_type {predictor_type}")
 
     return SegmentEntry(
         start_idx=start_idx,
@@ -1199,33 +1555,20 @@ def encode_timeseries_v2(
     n_segments = len(model_segments)
     header_len = len(context_bytes)
 
-    v2_segments = [
-        _round_segment_entry_v2(seg)
-        for seg in model_segments
-    ]
+    v2_segments = [_round_segment_entry_v2(seg) for seg in model_segments]
 
     q_resid_segments: list[list[int]] = []
 
     for seg in v2_segments:
         if seg.end_idx < seg.start_idx:
-            raise ValueError(
-                "Invalid V2 segment extent"
-            )
+            raise ValueError("Invalid V2 segment extent")
 
-        x_seg = list(
-            ts.values[
-                seg.start_idx : seg.end_idx + 1
-            ]
-        )
+        x_seg = list(ts.values[seg.start_idx : seg.end_idx + 1])
 
-        expected_length = (
-            seg.end_idx - seg.start_idx + 1
-        )
+        expected_length = seg.end_idx - seg.start_idx + 1
 
         if len(x_seg) != expected_length:
-            raise ValueError(
-                "V2 segment lies outside TimeSeries"
-            )
+            raise ValueError("V2 segment lies outside TimeSeries")
 
         preds = _build_preds_for_segmentation(
             x_seg,
@@ -1238,53 +1581,69 @@ def encode_timeseries_v2(
 
         Q = seg.quant_step_Q
 
-        q_res = [
-            round((value - pred) / Q)
-            for value, pred in zip(x_seg, preds)
-        ]
+        q_res = [round((value - pred) / Q) for value, pred in zip(x_seg, preds)]
 
         q_resid_segments.append(q_res)
 
-    varint_payloads = [
-        encode_int_list_varint(q_res)
-        for q_res in q_resid_segments
-    ]
-
-    zero_run_payloads = [
-        encode_int_list_zero_run_varint(q_res)
-        for q_res in q_resid_segments
-    ]
+    encoded_payloads: list[bytes] | None
 
     if residual_coding == "raw":
         coding_type = RESIDUAL_CODEC_RAW_INT32
         encoded_payloads = None
+        payload_bytes = sum(len(q_res) * 4 for q_res in q_resid_segments)
     elif residual_coding == "varint":
         coding_type = RESIDUAL_CODEC_VARINT
-        encoded_payloads = varint_payloads
+        encoded_payloads = [encode_int_list_varint(q_res) for q_res in q_resid_segments]
+        payload_bytes = sum(len(payload) for payload in encoded_payloads)
     elif residual_coding == "zero-run":
         coding_type = RESIDUAL_CODEC_ZERO_RUN_VARINT
-        encoded_payloads = zero_run_payloads
+        encoded_payloads = [
+            encode_int_list_zero_run_varint(q_res) for q_res in q_resid_segments
+        ]
+        payload_bytes = sum(len(payload) for payload in encoded_payloads)
     elif residual_coding == "auto":
-        varint_size = sum(
-            len(payload)
-            for payload in varint_payloads
-        )
-        zero_run_size = sum(
-            len(payload)
-            for payload in zero_run_payloads
-        )
+        varint_payloads = [encode_int_list_varint(q_res) for q_res in q_resid_segments]
+        zero_run_payloads = [
+            encode_int_list_zero_run_varint(q_res) for q_res in q_resid_segments
+        ]
+
+        varint_size = sum(len(payload) for payload in varint_payloads)
+        zero_run_size = sum(len(payload) for payload in zero_run_payloads)
 
         if zero_run_size < varint_size:
             coding_type = RESIDUAL_CODEC_ZERO_RUN_VARINT
             encoded_payloads = zero_run_payloads
+            payload_bytes = zero_run_size
         else:
             coding_type = RESIDUAL_CODEC_VARINT
             encoded_payloads = varint_payloads
+            payload_bytes = varint_size
     else:
         raise ValueError(
             f"Unknown residual_coding '{residual_coding}', "
             "expected 'raw', 'varint', 'zero-run' or 'auto'"
         )
+
+    for q_res in q_resid_segments:
+        if len(q_res) > MAX_SEGMENT_POINTS:
+            raise ValueError("Segment length exceeds maximum " f"{MAX_SEGMENT_POINTS}")
+
+    for payload in encoded_payloads or []:
+        if len(payload) > MAX_RESIDUAL_BLOCK_BYTES:
+            raise ValueError(
+                "Residual block exceeds maximum size "
+                f"{MAX_RESIDUAL_BLOCK_BYTES} bytes"
+            )
+
+    encoded_size = (
+        FILE_HEADER_STRUCT.size
+        + header_len
+        + n_segments * SEGMENT_ENTRY_V2_STRUCT.size
+        + RESIDUAL_SECTION_HEADER_STRUCT.size
+        + n_segments * RESIDUAL_BLOCK_HEADER_STRUCT.size
+        + payload_bytes
+    )
+    _validate_encoded_size(encoded_size)
 
     buf = bytearray()
 
@@ -1358,9 +1717,7 @@ def _decode_timeseries_v2(data: bytes) -> TimeSeries:
     representation, then invoking the unchanged V1 reconstruction path.
     """
     if len(data) < FILE_HEADER_STRUCT.size:
-        raise ValueError(
-            "Data too short to contain header"
-        )
+        raise ValueError("Data too short to contain header")
 
     (
         magic,
@@ -1377,27 +1734,19 @@ def _decode_timeseries_v2(data: bytes) -> TimeSeries:
     )
 
     if magic != b"LSG2":
-        raise ValueError(
-            "Invalid magic, not an LSG2 file"
-        )
+        raise ValueError("Invalid magic, not an LSG2 file")
 
     if version != FORMAT_VERSION_V2:
-        raise ValueError(
-            f"Expected LSG2 version 2, got {version}"
-        )
+        raise ValueError(f"Expected LSG2 version 2, got {version}")
 
     offset = FILE_HEADER_STRUCT.size
 
     context_end = offset + header_len
 
     if context_end > len(data):
-        raise ValueError(
-            "Truncated LSG2 context"
-        )
+        raise ValueError("Truncated LSG2 context")
 
-    context_bytes = data[
-        offset:context_end
-    ]
+    context_bytes = data[offset:context_end]
 
     offset = context_end
 
@@ -1419,15 +1768,10 @@ def _decode_timeseries_v2(data: bytes) -> TimeSeries:
     expected_start = 0
 
     for _ in range(n_segments):
-        segment_end = (
-            offset
-            + SEGMENT_ENTRY_V2_STRUCT.size
-        )
+        segment_end = offset + SEGMENT_ENTRY_V2_STRUCT.size
 
         if segment_end > len(data):
-            raise ValueError(
-                "Truncated V2 segment table"
-            )
+            raise ValueError("Truncated V2 segment table")
 
         (
             start_idx,
@@ -1446,20 +1790,13 @@ def _decode_timeseries_v2(data: bytes) -> TimeSeries:
         offset = segment_end
 
         if predictor_type not in (0, 1, 2):
-            raise ValueError(
-                f"Unsupported V2 predictor_type "
-                f"{predictor_type}"
-            )
+            raise ValueError(f"Unsupported V2 predictor_type " f"{predictor_type}")
 
         if end_idx < start_idx:
-            raise ValueError(
-                "Invalid V2 segment extent"
-            )
+            raise ValueError("Invalid V2 segment extent")
 
         if start_idx != expected_start:
-            raise ValueError(
-                "Non-contiguous V2 segment table"
-            )
+            raise ValueError("Non-contiguous V2 segment table")
 
         expected_start = end_idx + 1
 
@@ -1471,22 +1808,11 @@ def _decode_timeseries_v2(data: bytes) -> TimeSeries:
             seed_value,
         )
 
-        if any(
-            not math.isfinite(value)
-            for value in real_values
-        ):
-            raise ValueError(
-                "V2 segment metadata must be finite"
-            )
+        if any(not math.isfinite(value) for value in real_values):
+            raise ValueError("V2 segment metadata must be finite")
 
-        if (
-            not math.isfinite(quant_step_Q)
-            or quant_step_Q <= 0.0
-        ):
-            raise ValueError(
-                "V2 quantization step Q must "
-                "be finite and > 0"
-            )
+        if not math.isfinite(quant_step_Q) or quant_step_Q <= 0.0:
+            raise ValueError("V2 quantization step Q must " "be finite and > 0")
 
         expanded += SEGMENT_ENTRY_STRUCT.pack(
             start_idx,
@@ -1503,22 +1829,14 @@ def _decode_timeseries_v2(data: bytes) -> TimeSeries:
         )
 
     if expected_start != n_points and n_segments:
-        raise ValueError(
-            "V2 segment table does not cover "
-            "the declared point count"
-        )
+        raise ValueError("V2 segment table does not cover " "the declared point count")
 
     if n_segments == 0 and n_points != 0:
-        raise ValueError(
-            "Non-empty V2 series has no segments"
-        )
+        raise ValueError("Non-empty V2 series has no segments")
 
     expanded += data[offset:]
 
-    return _decode_timeseries_v1(
-        bytes(expanded)
-    )
-
+    return _decode_timeseries_v1(bytes(expanded))
 
 
 def encode_timeseries(
@@ -1556,10 +1874,10 @@ def decode_timeseries(data: bytes) -> TimeSeries:
     Version 2 uses the frozen 32-byte L32 segment-entry representation.
     Unknown versions fail closed.
     """
+    _preflight_lsg2(data)
+
     if len(data) < FILE_HEADER_STRUCT.size:
-        raise ValueError(
-            "Data too short to contain header"
-        )
+        raise ValueError("Data too short to contain header")
 
     (
         magic,
@@ -1576,21 +1894,14 @@ def decode_timeseries(data: bytes) -> TimeSeries:
     )
 
     if magic != b"LSG2":
-        raise ValueError(
-            "Invalid magic, not an LSG2 file"
-        )
+        raise ValueError("Invalid magic, not an LSG2 file")
 
     if version == FORMAT_VERSION_V1:
-        return _decode_timeseries_v1(
-            data
-        )
+        return _decode_timeseries_v1(data)
 
     if version == FORMAT_VERSION_V2:
-        return _decode_timeseries_v2(
-            data
-        )
+        return _decode_timeseries_v2(data)
 
     raise ValueError(
-        f"Unsupported LSG2 version {version}; "
-        "supported versions are 1 and 2"
+        f"Unsupported LSG2 version {version}; " "supported versions are 1 and 2"
     )

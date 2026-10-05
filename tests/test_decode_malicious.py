@@ -62,4 +62,4 @@ def test_decode_suspicious_npoints_raises_valueerror():
         decode_timeseries(bytes(data))
         assert False, "decode_timeseries should have raised on suspicious n_points"
     except ValueError as e:
-        assert "Suspicious n_points" in str(e)
+        assert "n_points=20000000 exceeds maximum 10000000" in str(e)

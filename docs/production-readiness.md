@@ -272,11 +272,20 @@ Failure behavior SHALL be deterministic.
 Current status:
 
 ```text
-REQUIRED
+PASS
 ```
 
-Existing ad-hoc sanity checks do not constitute a complete resource-limit
-contract.
+Evidence:
+
+```text
+docs/resource-limits.md
+tests/test_resource_limits.py
+tests/test_decode_malicious.py
+```
+
+The production resource contract now defines and enforces bounded point,
+segment, context, residual-block and total-input limits across V1/V2 decoding,
+encoding and CLI whole-file reads.
 
 ## Gate 5 — fuzzing
 
@@ -862,7 +871,6 @@ Current known non-PASS mandatory gates include:
 format stability             PARTIAL
 compatibility policy         PARTIAL
 malformed-input handling     PARTIAL
-resource limits              REQUIRED
 fuzzing                      REQUIRED
 corruption behavior          PARTIAL
 large-file behavior          REQUIRED
@@ -987,7 +995,7 @@ Affected gates require requalification.
 01 format stability             PARTIAL
 02 compatibility policy         PARTIAL
 03 malformed-input handling     PARTIAL
-04 resource limits              REQUIRED
+04 resource limits              PASS
 05 fuzzing                      REQUIRED
 06 corruption behavior          PARTIAL
 07 performance characterization PASS
@@ -1009,7 +1017,7 @@ Affected gates require requalification.
 Current mandatory PASS count:
 
 ```text
-2
+3
 ```
 
 This count is informational only.
