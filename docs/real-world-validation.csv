@@ -1,0 +1,16 @@
+dataset,codec,comparison_class,implementation,implementation_version,configuration,n_samples,raw_bytes,encoded_bytes,bits_per_sample,compression_ratio,rmse,max_abs_error,encode_time_ms,decode_time_ms
+appliances-energy.csv,raw,lossless,python-struct,3.12.3,float64_le,19735,157880,157880,64.000000000,1.000000000,0,0,0.353193000,0.662552000
+appliances-energy.csv,gzip,lossless,python-gzip,1.3,level_9_mtime_0,19735,157880,14745,5.977197872,10.707358427,0,0,35.980280000,0.663207000
+appliances-energy.csv,zstd,lossless,zstd-cli,"*** Zstandard CLI (64-bit) v1.5.5, by Yann Collet ***",cli_default,19735,157880,21164,8.579275399,7.459837460,0,0,2.859248000,2.412827000
+appliances-energy.csv,gorilla,lossless,gorillacompression,1.0.2,values_only_f64_canonical_frame,19735,157880,26799,10.863541931,5.891264599,0,0,23.851798000,171.941691000
+appliances-energy.csv,lasagna,lossy,lasagna-v2,0.3.0,adaptive_auto_varint,19735,157880,46997,19.051228781,3.359363364,10.2364019199,63.4364929199,85.108841000,11.354433000
+metro-traffic.csv,raw,lossless,python-struct,3.12.3,float64_le,48204,385632,385632,64.000000000,1.000000000,0,0,0.908898000,1.669017000
+metro-traffic.csv,gzip,lossless,python-gzip,1.3,level_9_mtime_0,48204,385632,102749,17.052360800,3.753146016,0,0,274.062170000,2.267292000
+metro-traffic.csv,zstd,lossless,zstd-cli,"*** Zstandard CLI (64-bit) v1.5.5, by Yann Collet ***",cli_default,48204,385632,99896,16.578873123,3.860334748,0,0,5.552172000,7.742836000
+metro-traffic.csv,gorilla,lossless,gorillacompression,1.0.2,values_only_f64_canonical_frame,48204,385632,90106,14.954111692,4.279759394,0,0,74.061436000,1174.849475000
+metro-traffic.csv,lasagna,lossy,lasagna-v2,0.3.0,adaptive_auto_varint,48204,385632,114626,19.023483528,3.364262907,224.401842859,829.730163574,189.537856000,28.648700000
+beijing-pm25.csv,raw,lossless,python-struct,3.12.3,float64_le,34139,273112,273112,64.000000000,1.000000000,0,0,0.631375000,0.769815000
+beijing-pm25.csv,gzip,lossless,python-gzip,1.3,level_9_mtime_0,34139,273112,47214,11.063944462,5.784555428,0,0,158.798744000,1.916474000
+beijing-pm25.csv,zstd,lossless,zstd-cli,"*** Zstandard CLI (64-bit) v1.5.5, by Yann Collet ***",cli_default,34139,273112,57649,13.509241630,4.737497615,0,0,6.174029000,4.010198000
+beijing-pm25.csv,gorilla,lossless,gorillacompression,1.0.2,values_only_f64_canonical_frame,34139,273112,109173,25.583174668,2.501644179,0,0,53.538026000,1419.598793000
+beijing-pm25.csv,lasagna,lossy,lasagna-v2,0.3.0,adaptive_auto_varint,34139,273112,81201,19.028325376,3.363406855,4.68227093084,63.3749084473,132.547998000,19.454542000

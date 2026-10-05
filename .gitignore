@@ -142,6 +142,9 @@ known_hosts
 data/*
 !data/README.md
 !data/examples/
+!data/real-world/
+data/real-world/*
+!data/real-world/manifest.tsv
 !data/tmp/
 
 data/raw/
@@ -154,6 +157,7 @@ data/tmp/*
 # CSV e LSG2 in root: ignorati (niente dataset/artefatti in top-level)
 *.csv
 !docs/external-codec-benchmark.csv
+!docs/real-world-validation.csv
 *.lsg2
 
 # Ma CONSENTI gli esempi espliciti (synthetic, documentativi)
