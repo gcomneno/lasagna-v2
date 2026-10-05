@@ -1,0 +1,5 @@
+codec	class	wire_status	run_threshold	selector_bytes_per_block
+raw_int32	baseline	active	0	0
+zigzag_varint	baseline	active	0	0
+zero_run_varint	candidate	shadow_reserved_id_2	3	0
+per_block_hybrid	candidate	projected_only	3	1

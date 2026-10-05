@@ -354,8 +354,17 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--residual-coding",
         type=str,
         default="varint",
-        choices=["raw", "varint"],
-        help="residual coding type",
+        choices=[
+            "raw",
+            "varint",
+            "zero-run",
+            "auto",
+        ],
+        help=(
+            "residual coding type "
+            "(V2 supports raw/varint/zero-run/auto; "
+            "V1 supports raw/varint)"
+        ),
     )
     p_enc.add_argument(
         "--format-version",

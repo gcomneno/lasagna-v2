@@ -298,6 +298,88 @@ def decode_int_list_varint(data: bytes, length: int) -> List[int]:
     return out
 
 
+ZERO_RUN_MIN_LENGTH = 3
+
+
+def encode_int_list_zero_run_varint(values: List[int]) -> bytes:
+    """Encode signed ints using shifted ZigZag literals plus zero runs."""
+    out = bytearray()
+    index = 0
+
+    while index < len(values):
+        if values[index] == 0:
+            run_end = index + 1
+
+            while (
+                run_end < len(values)
+                and values[run_end] == 0
+            ):
+                run_end += 1
+
+            run_length = run_end - index
+
+            if run_length >= ZERO_RUN_MIN_LENGTH:
+                out += _encode_varint(0)
+                out += _encode_varint(run_length)
+                index = run_end
+                continue
+
+        token = zigzag_encode(int(values[index])) + 1
+        out += _encode_varint(token)
+        index += 1
+
+    return bytes(out)
+
+
+def decode_int_list_zero_run_varint(
+    data: bytes,
+    length: int,
+) -> List[int]:
+    """Decode exactly `length` residuals from zero-run + varint."""
+    out: List[int] = []
+    offset = 0
+
+    while offset < len(data):
+        token, offset = _decode_varint(
+            data,
+            offset,
+        )
+
+        if token == 0:
+            run_length, offset = _decode_varint(
+                data,
+                offset,
+            )
+
+            if run_length < ZERO_RUN_MIN_LENGTH:
+                raise ValueError(
+                    "Invalid zero-run length"
+                )
+
+            if len(out) + run_length > length:
+                raise ValueError(
+                    "Zero-run exceeds declared residual count"
+                )
+
+            out.extend([0] * run_length)
+        else:
+            out.append(
+                zigzag_decode(token - 1)
+            )
+
+            if len(out) > length:
+                raise ValueError(
+                    "Decoded residual count exceeds declaration"
+                )
+
+    if len(out) != length:
+        raise ValueError(
+            "Decoded residual count does not match declaration"
+        )
+
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Stats, predittori, quantizzazione
 # ---------------------------------------------------------------------------
@@ -896,8 +978,14 @@ def decode_timeseries(data: bytes) -> TimeSeries:
     coding_type, _, _, _ = RESIDUAL_SECTION_HEADER_STRUCT.unpack_from(data, offset)
     offset += RESIDUAL_SECTION_HEADER_STRUCT.size
 
-    if coding_type not in (0, 1):
-        raise ValueError(f"Unsupported coding_type {coding_type} in decoder")
+    if coding_type not in (
+        RESIDUAL_CODEC_RAW_INT32,
+        RESIDUAL_CODEC_VARINT,
+        RESIDUAL_CODEC_ZERO_RUN_VARINT,
+    ):
+        raise ValueError(
+            f"Unsupported coding_type {coding_type} in decoder"
+        )
 
     # Residual blocks
     q_res_segments: List[List[int]] = [[] for _ in range(n_segments)]
@@ -919,15 +1007,30 @@ def decode_timeseries(data: bytes) -> TimeSeries:
         block_bytes = data[offset : offset + byte_len]
         offset += byte_len
 
-        if coding_type == 0:
+        if coding_type == RESIDUAL_CODEC_RAW_INT32:
             if seg_len * 4 != byte_len:
-                raise ValueError("byte_len != seg_len * 4 for raw residuals")
+                raise ValueError(
+                    "byte_len != seg_len * 4 for raw residuals"
+                )
             if seg_len > 0:
-                q_res = list(struct.unpack(f"<{seg_len}i", block_bytes))
+                q_res = list(
+                    struct.unpack(
+                        f"<{seg_len}i",
+                        block_bytes,
+                    )
+                )
             else:
                 q_res = []
+        elif coding_type == RESIDUAL_CODEC_VARINT:
+            q_res = decode_int_list_varint(
+                block_bytes,
+                seg_len,
+            )
         else:
-            q_res = decode_int_list_varint(block_bytes, seg_len)
+            q_res = decode_int_list_zero_run_varint(
+                block_bytes,
+                seg_len,
+            )
 
         q_res_segments[seg_id] = q_res
 
@@ -1142,14 +1245,45 @@ def encode_timeseries_v2(
 
         q_resid_segments.append(q_res)
 
+    varint_payloads = [
+        encode_int_list_varint(q_res)
+        for q_res in q_resid_segments
+    ]
+
+    zero_run_payloads = [
+        encode_int_list_zero_run_varint(q_res)
+        for q_res in q_resid_segments
+    ]
+
     if residual_coding == "raw":
         coding_type = RESIDUAL_CODEC_RAW_INT32
+        encoded_payloads = None
     elif residual_coding == "varint":
         coding_type = RESIDUAL_CODEC_VARINT
+        encoded_payloads = varint_payloads
+    elif residual_coding == "zero-run":
+        coding_type = RESIDUAL_CODEC_ZERO_RUN_VARINT
+        encoded_payloads = zero_run_payloads
+    elif residual_coding == "auto":
+        varint_size = sum(
+            len(payload)
+            for payload in varint_payloads
+        )
+        zero_run_size = sum(
+            len(payload)
+            for payload in zero_run_payloads
+        )
+
+        if zero_run_size < varint_size:
+            coding_type = RESIDUAL_CODEC_ZERO_RUN_VARINT
+            encoded_payloads = zero_run_payloads
+        else:
+            coding_type = RESIDUAL_CODEC_VARINT
+            encoded_payloads = varint_payloads
     else:
         raise ValueError(
             f"Unknown residual_coding '{residual_coding}', "
-            "expected 'raw' or 'varint'"
+            "expected 'raw', 'varint', 'zero-run' or 'auto'"
         )
 
     buf = bytearray()
@@ -1204,9 +1338,8 @@ def encode_timeseries_v2(
                     *q_res,
                 )
         else:
-            payload = encode_int_list_varint(
-                q_res
-            )
+            assert encoded_payloads is not None
+            payload = encoded_payloads[seg_id]
 
             buf += RESIDUAL_BLOCK_HEADER_STRUCT.pack(
                 seg_id,
