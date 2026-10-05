@@ -1,0 +1,16 @@
+codec	signal	n_samples
+v2	trend	10000
+v2	trend	100000
+v2	trend	1000000
+v2	sine_noise	10000
+v2	sine_noise	100000
+v2	sine_noise	1000000
+v2	regime_spike	10000
+v2	regime_spike	100000
+v2	regime_spike	1000000
+v1	trend	10000
+v1	trend	100000
+v1	sine_noise	10000
+v1	sine_noise	100000
+v1	regime_spike	10000
+v1	regime_spike	100000

@@ -1,0 +1,10 @@
+{
+  "lasagna_version": "0.3.0",
+  "logical_cpu_count": 4,
+  "machine": "x86_64",
+  "platform": "Linux-6.8.0-146-generic-x86_64-with-glibc2.39",
+  "python_version": "3.12.3",
+  "release": "6.8.0-146-generic",
+  "seed": 20261005,
+  "system": "Linux"
+}

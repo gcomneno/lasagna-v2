@@ -188,3 +188,5 @@ temp/
 
 # Baseline di detect-secrets: vogliamo TRACCIARLA
 !.secrets.baseline
+!docs/performance-benchmark-results.csv
+!docs/performance-benchmark-environment.json
