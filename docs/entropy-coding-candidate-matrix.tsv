@@ -1,0 +1,4 @@
+candidate	class	scope	block_independent	projected_fixed_overhead	projected_variable_overhead
+current_v2	control	block	yes	0	0
+huffman_sparse	entropy	block	yes	6	2_bytes_per_used_symbol
+deflate_raw	practical_compression	block	yes	4	0

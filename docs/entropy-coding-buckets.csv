@@ -1,0 +1,11 @@
+candidate,bucket,block_count,win_blocks,win_fraction,median_delta_bytes,p95_delta_bytes,worst_delta_bytes
+huffman_sparse,1..16,19,0,0.0,17,23,23
+huffman_sparse,17..32,25549,1288,0.05041293201299464,26,34,47
+huffman_sparse,33..64,36,0,0.0,29.5,37,37
+huffman_sparse,65..128,24,4,0.16666666666666666,27.0,35,35
+huffman_sparse,>128,4,4,1.0,-149.5,-104,-104
+deflate_raw,1..16,19,0,0.0,6,6,6
+deflate_raw,17..32,25549,1312,0.05135230341696348,6,6,6
+deflate_raw,33..64,36,2,0.05555555555555555,4.0,6,6
+deflate_raw,65..128,24,24,1.0,-18.0,-9,-9
+deflate_raw,>128,4,4,1.0,-188.0,-132,-132
