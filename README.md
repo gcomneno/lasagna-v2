@@ -268,6 +268,49 @@ lasagna2 info /tmp/trend-v2.lsg2 -v
 
 ---
 
+## Migrating from v0.2.2 to v0.3.0
+
+v0.3.0 intentionally changes the implicit encoding default from V1 to V2:
+
+```text
+v0.2.2:
+encode_timeseries() -> V1
+lasagna2 encode      -> V1
+
+v0.3.0:
+encode_timeseries() -> V2
+lasagna2 encode      -> V2
+```
+
+Decoding remains backward-compatible: `decode_timeseries()` and the CLI decoder
+continue to auto-detect and decode both V1 and V2 files.
+
+If existing code depends on byte-compatible V1 output, make the legacy format
+explicit instead of relying on the default.
+
+Python:
+
+```python
+from lasagna2 import encode_timeseries_v1
+
+encoded_v1 = encode_timeseries_v1(ts)
+```
+
+CLI:
+
+```bash
+lasagna2 encode input.csv output.lsg2 \
+  --dt 1 \
+  --t0 1970-01-01T00:00:00Z \
+  --unit arbitrary \
+  --format-version 1
+```
+
+V1 remains a supported compatibility format. This migration does not establish
+a removal schedule for V1.
+
+---
+
 ## Python API
 
 `encode_timeseries()` uses V2 by default:
