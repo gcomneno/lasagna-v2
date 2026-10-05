@@ -158,6 +158,8 @@ data/tmp/*
 *.csv
 !docs/external-codec-benchmark.csv
 !docs/real-world-validation.csv
+!docs/sensitivity-segmentation-followup.csv
+!docs/sensitivity-results.csv
 *.lsg2
 
 # Ma CONSENTI gli esempi espliciti (synthetic, documentativi)

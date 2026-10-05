@@ -1,0 +1,13 @@
+config_id	axis	C_Q	Q_MIN	min_segment_length	max_segment_length	mse_threshold
+seg-64-256-mse32	segment_interaction	0.5	0.000001	64	256	32
+seg-64-256-mse128	segment_interaction	0.5	0.000001	64	256	128
+seg-64-256-mse512	segment_interaction	0.5	0.000001	64	256	512
+seg-64-256-mse2048	segment_interaction	0.5	0.000001	64	256	2048
+seg-128-512-mse32	segment_interaction	0.5	0.000001	128	512	32
+seg-128-512-mse128	segment_interaction	0.5	0.000001	128	512	128
+seg-128-512-mse512	segment_interaction	0.5	0.000001	128	512	512
+seg-128-512-mse2048	segment_interaction	0.5	0.000001	128	512	2048
+seg-256-1024-mse32	segment_interaction	0.5	0.000001	256	1024	32
+seg-256-1024-mse128	segment_interaction	0.5	0.000001	256	1024	128
+seg-256-1024-mse512	segment_interaction	0.5	0.000001	256	1024	512
+seg-256-1024-mse2048	segment_interaction	0.5	0.000001	256	1024	2048

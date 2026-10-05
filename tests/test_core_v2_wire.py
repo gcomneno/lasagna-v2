@@ -286,3 +286,117 @@ def test_v2_rejects_q_that_rounds_to_zero() -> None:
             Q_MIN=1e-50,
             segment_mode="fixed",
         )
+
+
+def test_v1_implicit_quantization_default_remains_legacy_05() -> None:
+    ts = core.TimeSeries(
+        values=[
+            0.0,
+            0.3,
+            0.8,
+            1.7,
+            3.1,
+            5.2,
+            8.0,
+            11.5,
+        ],
+        dt=1.0,
+        t0="1970-01-01T00:00:00Z",
+        unit="test",
+    )
+
+    implicit = core.encode_timeseries_v1(
+        ts,
+        segment_length=8,
+        predictor="mean",
+        residual_coding="varint",
+    )
+
+    explicit = core.encode_timeseries_v1(
+        ts,
+        segment_length=8,
+        predictor="mean",
+        C_Q=0.5,
+        residual_coding="varint",
+    )
+
+    assert implicit == explicit
+
+
+def test_v2_implicit_quantization_default_is_0125() -> None:
+    ts = core.TimeSeries(
+        values=[
+            0.0,
+            0.3,
+            0.8,
+            1.7,
+            3.1,
+            5.2,
+            8.0,
+            11.5,
+        ],
+        dt=1.0,
+        t0="1970-01-01T00:00:00Z",
+        unit="test",
+    )
+
+    implicit = core.encode_timeseries_v2(
+        ts,
+        segment_length=8,
+        predictor="mean",
+        residual_coding="varint",
+    )
+
+    explicit = core.encode_timeseries_v2(
+        ts,
+        segment_length=8,
+        predictor="mean",
+        C_Q=0.125,
+        residual_coding="varint",
+    )
+
+    legacy_quantization = core.encode_timeseries_v2(
+        ts,
+        segment_length=8,
+        predictor="mean",
+        C_Q=0.5,
+        residual_coding="varint",
+    )
+
+    assert implicit == explicit
+    assert implicit != legacy_quantization
+
+
+def test_default_encoder_uses_v2_quantization_default_0125() -> None:
+    ts = core.TimeSeries(
+        values=[
+            0.0,
+            0.3,
+            0.8,
+            1.7,
+            3.1,
+            5.2,
+            8.0,
+            11.5,
+        ],
+        dt=1.0,
+        t0="1970-01-01T00:00:00Z",
+        unit="test",
+    )
+
+    default_bytes = core.encode_timeseries(
+        ts,
+        segment_length=8,
+        predictor="mean",
+        residual_coding="varint",
+    )
+
+    explicit_v2 = core.encode_timeseries_v2(
+        ts,
+        segment_length=8,
+        predictor="mean",
+        C_Q=0.125,
+        residual_coding="varint",
+    )
+
+    assert default_bytes == explicit_v2
