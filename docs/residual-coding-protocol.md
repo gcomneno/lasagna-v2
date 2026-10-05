@@ -521,4 +521,3 @@ A synthetic-only win is insufficient.
 
 A per-block hybrid is not justified unless its selector-inclusive total is
 smaller than the existing varint representation.
-

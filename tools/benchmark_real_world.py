@@ -37,9 +37,7 @@ def benchmark_real_world_corpus(
         path = input_dir / filename
 
         if not path.is_file():
-            raise ValueError(
-                f"Missing canonical dataset: {path}"
-            )
+            raise ValueError(f"Missing canonical dataset: {path}")
 
         dataset_results = benchmark_dataset(
             path,
@@ -50,30 +48,16 @@ def benchmark_real_world_corpus(
 
         if len(dataset_results) != 5:
             raise ValueError(
-                f"{filename}: expected 5 benchmark rows, "
-                f"got {len(dataset_results)}"
+                f"{filename}: expected 5 benchmark rows, " f"got {len(dataset_results)}"
             )
 
-        lasagna_rows = [
-            row
-            for row in dataset_results
-            if row.codec == "lasagna"
-        ]
+        lasagna_rows = [row for row in dataset_results if row.codec == "lasagna"]
 
         if len(lasagna_rows) != 1:
-            raise ValueError(
-                f"{filename}: expected exactly one "
-                "Lasagna result"
-            )
+            raise ValueError(f"{filename}: expected exactly one " "Lasagna result")
 
-        if (
-            lasagna_rows[0].configuration
-            != FROZEN_LASAGNA_CONFIG.name
-        ):
-            raise ValueError(
-                f"{filename}: unexpected Lasagna "
-                "configuration"
-            )
+        if lasagna_rows[0].configuration != FROZEN_LASAGNA_CONFIG.name:
+            raise ValueError(f"{filename}: unexpected Lasagna " "configuration")
 
         results.extend(dataset_results)
 
@@ -91,9 +75,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--input-dir",
         type=Path,
-        default=Path(
-            "data/real-world/canonical"
-        ),
+        default=Path("data/real-world/canonical"),
     )
 
     parser.add_argument(
@@ -142,10 +124,7 @@ def main() -> int:
         )
 
     print(f"RESULT_ROWS={len(results)}")
-    print(
-        "LASAGNA_CONFIGURATION="
-        f"{FROZEN_LASAGNA_CONFIG.name}"
-    )
+    print("LASAGNA_CONFIGURATION=" f"{FROZEN_LASAGNA_CONFIG.name}")
     print(f"OUTPUT={args.output}")
 
     return 0

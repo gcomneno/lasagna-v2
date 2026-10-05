@@ -26,8 +26,8 @@ for import_path in (ROOT, TOOLS):
     if value not in sys.path:
         sys.path.insert(0, value)
 
-from benchmark_codec import load_csv_values
-from lasagna2 import core
+from benchmark_codec import load_csv_values  # noqa: E402
+from lasagna2 import core  # noqa: E402
 
 
 HUFFMAN_FIXED_HEADER = struct.Struct("<HHH")
@@ -127,9 +127,7 @@ def _load_residual_module():
     )
 
     if spec is None or spec.loader is None:
-        raise RuntimeError(
-            "Unable to load residual-distribution module"
-        )
+        raise RuntimeError("Unable to load residual-distribution module")
 
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
@@ -147,10 +145,7 @@ def byte_entropy(data: bytes) -> float:
     counts = Counter(data)
     total = len(data)
 
-    return -sum(
-        (count / total) * math.log2(count / total)
-        for count in counts.values()
-    )
+    return -sum((count / total) * math.log2(count / total) for count in counts.values())
 
 
 def _huffman_code_lengths(
@@ -184,10 +179,7 @@ def _huffman_code_lengths(
         right = heapq.heappop(heap)
 
         parent = HuffmanNode(
-            frequency=(
-                left.frequency
-                + right.frequency
-            ),
+            frequency=(left.frequency + right.frequency),
             order=order,
             left=left,
             right=right,
@@ -235,10 +227,7 @@ def _canonical_codes(
     previous_length = 0
 
     for length, symbol in ordered:
-        code <<= (
-            length
-            - previous_length
-        )
+        code <<= length - previous_length
 
         codes[symbol] = (
             code,
@@ -255,32 +244,19 @@ def encode_huffman_sparse(
     data: bytes,
 ) -> bytes:
     if len(data) > 0xFFFF:
-        raise ValueError(
-            "Huffman benchmark block exceeds uint16 length"
-        )
+        raise ValueError("Huffman benchmark block exceeds uint16 length")
 
-    lengths = _huffman_code_lengths(
-        data
-    )
+    lengths = _huffman_code_lengths(data)
 
-    codes = _canonical_codes(
-        lengths
-    )
+    codes = _canonical_codes(lengths)
 
-    bit_length = sum(
-        codes[byte][1]
-        for byte in data
-    )
+    bit_length = sum(codes[byte][1] for byte in data)
 
     if bit_length > 0xFFFF:
-        raise ValueError(
-            "Huffman benchmark bitstream exceeds uint16 length"
-        )
+        raise ValueError("Huffman benchmark bitstream exceeds uint16 length")
 
     if len(lengths) > 0xFFFF:
-        raise ValueError(
-            "Huffman symbol count exceeds uint16"
-        )
+        raise ValueError("Huffman symbol count exceeds uint16")
 
     out = bytearray(
         HUFFMAN_FIXED_HEADER.pack(
@@ -294,9 +270,7 @@ def encode_huffman_sparse(
         length = lengths[symbol]
 
         if length > 0xFF:
-            raise ValueError(
-                "Huffman code length exceeds uint8"
-            )
+            raise ValueError("Huffman code length exceeds uint8")
 
         out += HUFFMAN_SYMBOL_ENTRY.pack(
             symbol,
@@ -309,35 +283,20 @@ def encode_huffman_sparse(
     for byte in data:
         code, code_length = codes[byte]
 
-        accumulator = (
-            accumulator << code_length
-        ) | code
+        accumulator = (accumulator << code_length) | code
 
         accumulator_bits += code_length
 
         while accumulator_bits >= 8:
             shift = accumulator_bits - 8
-            out.append(
-                (accumulator >> shift)
-                & 0xFF
-            )
+            out.append((accumulator >> shift) & 0xFF)
 
-            accumulator &= (
-                (1 << shift) - 1
-                if shift
-                else 0
-            )
+            accumulator &= (1 << shift) - 1 if shift else 0
 
             accumulator_bits = shift
 
     if accumulator_bits:
-        out.append(
-            (
-                accumulator
-                << (8 - accumulator_bits)
-            )
-            & 0xFF
-        )
+        out.append((accumulator << (8 - accumulator_bits)) & 0xFF)
 
     return bytes(out)
 
@@ -346,9 +305,7 @@ def decode_huffman_sparse(
     encoded: bytes,
 ) -> bytes:
     if len(encoded) < HUFFMAN_FIXED_HEADER.size:
-        raise ValueError(
-            "Truncated Huffman header"
-        )
+        raise ValueError("Truncated Huffman header")
 
     (
         original_length,
@@ -361,68 +318,40 @@ def decode_huffman_sparse(
 
     offset = HUFFMAN_FIXED_HEADER.size
 
-    codebook_bytes = (
-        symbol_count
-        * HUFFMAN_SYMBOL_ENTRY.size
-    )
+    codebook_bytes = symbol_count * HUFFMAN_SYMBOL_ENTRY.size
 
-    if (
-        offset + codebook_bytes
-        > len(encoded)
-    ):
-        raise ValueError(
-            "Truncated Huffman codebook"
-        )
+    if offset + codebook_bytes > len(encoded):
+        raise ValueError("Truncated Huffman codebook")
 
     lengths: dict[int, int] = {}
 
     for _ in range(symbol_count):
-        symbol, length = (
-            HUFFMAN_SYMBOL_ENTRY.unpack_from(
-                encoded,
-                offset,
-            )
+        symbol, length = HUFFMAN_SYMBOL_ENTRY.unpack_from(
+            encoded,
+            offset,
         )
         offset += HUFFMAN_SYMBOL_ENTRY.size
 
         if length == 0:
-            raise ValueError(
-                "Invalid zero-length Huffman code"
-            )
+            raise ValueError("Invalid zero-length Huffman code")
 
         if symbol in lengths:
-            raise ValueError(
-                "Duplicate Huffman symbol"
-            )
+            raise ValueError("Duplicate Huffman symbol")
 
         lengths[symbol] = length
 
-    bitstream_bytes = (
-        bit_length + 7
-    ) // 8
+    bitstream_bytes = (bit_length + 7) // 8
 
-    if (
-        offset + bitstream_bytes
-        != len(encoded)
-    ):
-        raise ValueError(
-            "Malformed Huffman payload length"
-        )
+    if offset + bitstream_bytes != len(encoded):
+        raise ValueError("Malformed Huffman payload length")
 
     if original_length == 0:
-        if (
-            bit_length != 0
-            or symbol_count != 0
-        ):
-            raise ValueError(
-                "Malformed empty Huffman block"
-            )
+        if bit_length != 0 or symbol_count != 0:
+            raise ValueError("Malformed empty Huffman block")
         return b""
 
     if not lengths:
-        raise ValueError(
-            "Missing Huffman codebook"
-        )
+        raise ValueError("Missing Huffman codebook")
 
     codes = _canonical_codes(lengths)
 
@@ -446,13 +375,9 @@ def decode_huffman_sparse(
             if consumed_bits >= bit_length:
                 break
 
-            bit = (
-                byte >> shift
-            ) & 1
+            bit = (byte >> shift) & 1
 
-            code = (
-                code << 1
-            ) | bit
+            code = (code << 1) | bit
             code_length += 1
             consumed_bits += 1
 
@@ -469,24 +394,16 @@ def decode_huffman_sparse(
                 code_length = 0
 
                 if len(out) > original_length:
-                    raise ValueError(
-                        "Huffman output exceeds declared length"
-                    )
+                    raise ValueError("Huffman output exceeds declared length")
 
     if consumed_bits != bit_length:
-        raise ValueError(
-            "Truncated Huffman bitstream"
-        )
+        raise ValueError("Truncated Huffman bitstream")
 
     if code_length != 0:
-        raise ValueError(
-            "Incomplete Huffman terminal code"
-        )
+        raise ValueError("Incomplete Huffman terminal code")
 
     if len(out) != original_length:
-        raise ValueError(
-            "Huffman output length mismatch"
-        )
+        raise ValueError("Huffman output length mismatch")
 
     return bytes(out)
 
@@ -495,24 +412,17 @@ def encode_deflate_raw(
     data: bytes,
 ) -> bytes:
     if len(data) > 0xFFFF:
-        raise ValueError(
-            "DEFLATE benchmark block exceeds uint16 length"
-        )
+        raise ValueError("DEFLATE benchmark block exceeds uint16 length")
 
     compressor = zlib.compressobj(
         level=1,
         wbits=-15,
     )
 
-    stream = (
-        compressor.compress(data)
-        + compressor.flush()
-    )
+    stream = compressor.compress(data) + compressor.flush()
 
     if len(stream) > 0xFFFF:
-        raise ValueError(
-            "DEFLATE benchmark stream exceeds uint16 length"
-        )
+        raise ValueError("DEFLATE benchmark stream exceeds uint16 length")
 
     return (
         DEFLATE_FIXED_HEADER.pack(
@@ -527,9 +437,7 @@ def decode_deflate_raw(
     encoded: bytes,
 ) -> bytes:
     if len(encoded) < DEFLATE_FIXED_HEADER.size:
-        raise ValueError(
-            "Truncated DEFLATE header"
-        )
+        raise ValueError("Truncated DEFLATE header")
 
     (
         original_length,
@@ -539,33 +447,20 @@ def decode_deflate_raw(
         0,
     )
 
-    stream = encoded[
-        DEFLATE_FIXED_HEADER.size:
-    ]
+    stream = encoded[DEFLATE_FIXED_HEADER.size :]
 
     if len(stream) != compressed_length:
-        raise ValueError(
-            "Malformed DEFLATE payload length"
-        )
+        raise ValueError("Malformed DEFLATE payload length")
 
-    decompressor = zlib.decompressobj(
-        wbits=-15
-    )
+    decompressor = zlib.decompressobj(wbits=-15)
 
-    decoded = (
-        decompressor.decompress(stream)
-        + decompressor.flush()
-    )
+    decoded = decompressor.decompress(stream) + decompressor.flush()
 
     if decompressor.unused_data:
-        raise ValueError(
-            "Unexpected trailing DEFLATE data"
-        )
+        raise ValueError("Unexpected trailing DEFLATE data")
 
     if len(decoded) != original_length:
-        raise ValueError(
-            "DEFLATE output length mismatch"
-        )
+        raise ValueError("DEFLATE output length mismatch")
 
     return decoded
 
@@ -581,13 +476,7 @@ def median_runtime_ms(
     for _ in range(BENCHMARK_RUNS):
         start = time.perf_counter_ns()
         operation()
-        samples.append(
-            (
-                time.perf_counter_ns()
-                - start
-            )
-            / 1_000_000.0
-        )
+        samples.append((time.perf_counter_ns() - start) / 1_000_000.0)
 
     return statistics.median(samples)
 
@@ -596,12 +485,7 @@ def _source_payloads(
     q_blocks: list[list[int]],
     base_residual_codec: str,
 ) -> tuple[str, list[bytes]]:
-    varint_payloads = [
-        core.encode_int_list_varint(
-            block
-        )
-        for block in q_blocks
-    ]
+    varint_payloads = [core.encode_int_list_varint(block) for block in q_blocks]
 
     if base_residual_codec == "varint":
         return (
@@ -610,23 +494,12 @@ def _source_payloads(
         )
 
     if base_residual_codec != "auto":
-        raise ValueError(
-            "Unsupported benchmark base residual codec"
-        )
+        raise ValueError("Unsupported benchmark base residual codec")
 
-    zero_payloads = [
-        core.encode_int_list_zero_run_varint(
-            block
-        )
-        for block in q_blocks
-    ]
+    zero_payloads = [core.encode_int_list_zero_run_varint(block) for block in q_blocks]
 
-    if sum(
-        len(payload)
-        for payload in zero_payloads
-    ) < sum(
-        len(payload)
-        for payload in varint_payloads
+    if sum(len(payload) for payload in zero_payloads) < sum(
+        len(payload) for payload in varint_payloads
     ):
         return (
             "zero-run",
@@ -678,11 +551,9 @@ def evaluate_stream(
 ]:
     values = load_csv_values(dataset)
 
-    segments, q_blocks = (
-        residuals.build_v2_residual_stream(
-            values,
-            predictor,
-        )
+    segments, q_blocks = residuals.build_v2_residual_stream(
+        values,
+        predictor,
     )
 
     (
@@ -693,56 +564,29 @@ def evaluate_stream(
         base_residual_codec,
     )
 
-    huffman_payloads = [
-        encode_huffman_sparse(payload)
-        for payload in source_payloads
-    ]
+    huffman_payloads = [encode_huffman_sparse(payload) for payload in source_payloads]
 
-    deflate_payloads = [
-        encode_deflate_raw(payload)
-        for payload in source_payloads
-    ]
+    deflate_payloads = [encode_deflate_raw(payload) for payload in source_payloads]
 
     if [
-        decode_huffman_sparse(payload)
-        for payload in huffman_payloads
+        decode_huffman_sparse(payload) for payload in huffman_payloads
     ] != source_payloads:
-        raise ValueError(
-            "Huffman roundtrip mismatch"
-        )
+        raise ValueError("Huffman roundtrip mismatch")
 
-    if [
-        decode_deflate_raw(payload)
-        for payload in deflate_payloads
-    ] != source_payloads:
-        raise ValueError(
-            "DEFLATE roundtrip mismatch"
-        )
+    if [decode_deflate_raw(payload) for payload in deflate_payloads] != source_payloads:
+        raise ValueError("DEFLATE roundtrip mismatch")
 
-    source_sizes = [
-        len(payload)
-        for payload in source_payloads
-    ]
+    source_sizes = [len(payload) for payload in source_payloads]
 
-    huffman_sizes = [
-        len(payload)
-        for payload in huffman_payloads
-    ]
+    huffman_sizes = [len(payload) for payload in huffman_payloads]
 
-    deflate_sizes = [
-        len(payload)
-        for payload in deflate_payloads
-    ]
+    deflate_sizes = [len(payload) for payload in deflate_payloads]
 
     source_total = sum(source_sizes)
 
-    huffman_forced = sum(
-        huffman_sizes
-    )
+    huffman_forced = sum(huffman_sizes)
 
-    deflate_forced = sum(
-        deflate_sizes
-    )
+    deflate_forced = sum(deflate_sizes)
 
     huffman_gross = sum(
         min(source, candidate)
@@ -760,20 +604,11 @@ def evaluate_stream(
         )
     )
 
-    selector_bytes = (
-        SELECTOR_BYTES_PER_BLOCK
-        * len(source_payloads)
-    )
+    selector_bytes = SELECTOR_BYTES_PER_BLOCK * len(source_payloads)
 
-    huffman_selective = (
-        huffman_gross
-        + selector_bytes
-    )
+    huffman_selective = huffman_gross + selector_bytes
 
-    deflate_selective = (
-        deflate_gross
-        + selector_bytes
-    )
+    deflate_selective = deflate_gross + selector_bytes
 
     current_total = _current_v2_size(
         values,
@@ -781,9 +616,7 @@ def evaluate_stream(
         base_residual_codec,
     )
 
-    block_rows: list[
-        dict[str, object]
-    ] = []
+    block_rows: list[dict[str, object]] = []
 
     for index, (
         segment,
@@ -807,65 +640,30 @@ def evaluate_stream(
             0,
         )
 
-        huffman_bitstream_bytes = (
-            bit_length + 7
-        ) // 8
+        huffman_bitstream_bytes = (bit_length + 7) // 8
 
-        huffman_codebook_bytes = (
-            2 * symbol_count
-        )
+        huffman_codebook_bytes = 2 * symbol_count
 
-        deflate_stream_bytes = (
-            len(deflate)
-            - DEFLATE_FIXED_HEADER.size
-        )
+        deflate_stream_bytes = len(deflate) - DEFLATE_FIXED_HEADER.size
 
         block_rows.append(
             {
                 "evidence_group": evidence_group,
                 "dataset": dataset.name,
                 "predictor": predictor,
-                "base_residual_codec": (
-                    selected_base
-                ),
+                "base_residual_codec": (selected_base),
                 "segment_index": index,
-                "segment_length": (
-                    segment.end_idx
-                    - segment.start_idx
-                    + 1
-                ),
-                "source_payload_bytes": (
-                    len(source)
-                ),
-                "source_symbol_count": (
-                    len(set(source))
-                ),
-                "source_byte_entropy_bits_per_symbol": (
-                    byte_entropy(source)
-                ),
-                "huffman_bitstream_bytes": (
-                    huffman_bitstream_bytes
-                ),
-                "huffman_codebook_bytes": (
-                    huffman_codebook_bytes
-                ),
-                "huffman_total_bytes": (
-                    len(huffman)
-                ),
-                "huffman_delta_bytes": (
-                    len(huffman)
-                    - len(source)
-                ),
-                "deflate_stream_bytes": (
-                    deflate_stream_bytes
-                ),
-                "deflate_total_bytes": (
-                    len(deflate)
-                ),
-                "deflate_delta_bytes": (
-                    len(deflate)
-                    - len(source)
-                ),
+                "segment_length": (segment.end_idx - segment.start_idx + 1),
+                "source_payload_bytes": (len(source)),
+                "source_symbol_count": (len(set(source))),
+                "source_byte_entropy_bits_per_symbol": (byte_entropy(source)),
+                "huffman_bitstream_bytes": (huffman_bitstream_bytes),
+                "huffman_codebook_bytes": (huffman_codebook_bytes),
+                "huffman_total_bytes": (len(huffman)),
+                "huffman_delta_bytes": (len(huffman) - len(source)),
+                "deflate_stream_bytes": (deflate_stream_bytes),
+                "deflate_total_bytes": (len(deflate)),
+                "deflate_delta_bytes": (len(deflate) - len(source)),
             }
         )
 
@@ -879,10 +677,7 @@ def evaluate_stream(
         "source_payload_bytes": source_total,
         "current_v2_total_bytes": current_total,
         "huffman_forced_bytes": huffman_forced,
-        "huffman_forced_delta": (
-            huffman_forced
-            - source_total
-        ),
+        "huffman_forced_delta": (huffman_forced - source_total),
         "huffman_win_blocks": sum(
             candidate < source
             for source, candidate in zip(
@@ -904,35 +699,16 @@ def evaluate_stream(
                 huffman_sizes,
             )
         ),
-        "huffman_selective_gross_bytes": (
-            huffman_gross
-        ),
-        "huffman_selector_bytes": (
-            selector_bytes
-        ),
-        "huffman_selective_bytes": (
-            huffman_selective
-        ),
-        "huffman_selective_delta": (
-            huffman_selective
-            - source_total
-        ),
+        "huffman_selective_gross_bytes": (huffman_gross),
+        "huffman_selector_bytes": (selector_bytes),
+        "huffman_selective_bytes": (huffman_selective),
+        "huffman_selective_delta": (huffman_selective - source_total),
         "huffman_projected_total_bytes": (
-            current_total
-            - source_total
-            + huffman_selective
+            current_total - source_total + huffman_selective
         ),
-        "huffman_projected_total_delta": (
-            huffman_selective
-            - source_total
-        ),
-        "deflate_forced_bytes": (
-            deflate_forced
-        ),
-        "deflate_forced_delta": (
-            deflate_forced
-            - source_total
-        ),
+        "huffman_projected_total_delta": (huffman_selective - source_total),
+        "deflate_forced_bytes": (deflate_forced),
+        "deflate_forced_delta": (deflate_forced - source_total),
         "deflate_win_blocks": sum(
             candidate < source
             for source, candidate in zip(
@@ -954,28 +730,14 @@ def evaluate_stream(
                 deflate_sizes,
             )
         ),
-        "deflate_selective_gross_bytes": (
-            deflate_gross
-        ),
-        "deflate_selector_bytes": (
-            selector_bytes
-        ),
-        "deflate_selective_bytes": (
-            deflate_selective
-        ),
-        "deflate_selective_delta": (
-            deflate_selective
-            - source_total
-        ),
+        "deflate_selective_gross_bytes": (deflate_gross),
+        "deflate_selector_bytes": (selector_bytes),
+        "deflate_selective_bytes": (deflate_selective),
+        "deflate_selective_delta": (deflate_selective - source_total),
         "deflate_projected_total_bytes": (
-            current_total
-            - source_total
-            + deflate_selective
+            current_total - source_total + deflate_selective
         ),
-        "deflate_projected_total_delta": (
-            deflate_selective
-            - source_total
-        ),
+        "deflate_projected_total_delta": (deflate_selective - source_total),
         "huffman_encode_median_ms": "",
         "huffman_decode_median_ms": "",
         "deflate_encode_median_ms": "",
@@ -983,40 +745,20 @@ def evaluate_stream(
     }
 
     if predictor == "auto":
-        result[
-            "huffman_encode_median_ms"
-        ] = median_runtime_ms(
-            lambda: [
-                encode_huffman_sparse(payload)
-                for payload in source_payloads
-            ]
+        result["huffman_encode_median_ms"] = median_runtime_ms(
+            lambda: [encode_huffman_sparse(payload) for payload in source_payloads]
         )
 
-        result[
-            "huffman_decode_median_ms"
-        ] = median_runtime_ms(
-            lambda: [
-                decode_huffman_sparse(payload)
-                for payload in huffman_payloads
-            ]
+        result["huffman_decode_median_ms"] = median_runtime_ms(
+            lambda: [decode_huffman_sparse(payload) for payload in huffman_payloads]
         )
 
-        result[
-            "deflate_encode_median_ms"
-        ] = median_runtime_ms(
-            lambda: [
-                encode_deflate_raw(payload)
-                for payload in source_payloads
-            ]
+        result["deflate_encode_median_ms"] = median_runtime_ms(
+            lambda: [encode_deflate_raw(payload) for payload in source_payloads]
         )
 
-        result[
-            "deflate_decode_median_ms"
-        ] = median_runtime_ms(
-            lambda: [
-                decode_deflate_raw(payload)
-                for payload in deflate_payloads
-            ]
+        result["deflate_decode_median_ms"] = median_runtime_ms(
+            lambda: [decode_deflate_raw(payload) for payload in deflate_payloads]
         )
 
     return result, block_rows
@@ -1046,15 +788,10 @@ def percentile_nearest_rank(
     ordered = sorted(values)
     rank = max(
         1,
-        math.ceil(
-            percentile
-            * len(ordered)
-        ),
+        math.ceil(percentile * len(ordered)),
     )
 
-    return ordered[
-        rank - 1
-    ]
+    return ordered[rank - 1]
 
 
 def summarize_buckets(
@@ -1078,24 +815,12 @@ def summarize_buckets(
         ] = {}
 
         for row in block_rows:
-            bucket = bucket_name(
-                int(
-                    row[
-                        "source_payload_bytes"
-                    ]
-                )
-            )
+            bucket = bucket_name(int(row["source_payload_bytes"]))
 
             grouped.setdefault(
                 bucket,
                 [],
-            ).append(
-                int(
-                    row[
-                        delta_field
-                    ]
-                )
-            )
+            ).append(int(row[delta_field]))
 
         for bucket in (
             "1..16",
@@ -1112,10 +837,7 @@ def summarize_buckets(
             if not deltas:
                 continue
 
-            wins = sum(
-                delta < 0
-                for delta in deltas
-            )
+            wins = sum(delta < 0 for delta in deltas)
 
             output.append(
                 {
@@ -1123,24 +845,15 @@ def summarize_buckets(
                     "bucket": bucket,
                     "block_count": len(deltas),
                     "win_blocks": wins,
-                    "win_fraction": (
-                        wins
-                        / len(deltas)
-                    ),
-                    "median_delta_bytes": (
-                        statistics.median(
-                            deltas
-                        )
-                    ),
+                    "win_fraction": (wins / len(deltas)),
+                    "median_delta_bytes": (statistics.median(deltas)),
                     "p95_delta_bytes": (
                         percentile_nearest_rank(
                             deltas,
                             0.95,
                         )
                     ),
-                    "worst_delta_bytes": (
-                        max(deltas)
-                    ),
+                    "worst_delta_bytes": (max(deltas)),
                 }
             )
 
@@ -1176,33 +889,25 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--matrix",
         type=Path,
-        default=Path(
-            "docs/residual-distribution-matrix.tsv"
-        ),
+        default=Path("docs/residual-distribution-matrix.tsv"),
     )
 
     parser.add_argument(
         "--results",
         type=Path,
-        default=Path(
-            "/tmp/lasagna-v2-issue9-entropy-results.csv"
-        ),
+        default=Path("/tmp/lasagna-v2-issue9-entropy-results.csv"),
     )
 
     parser.add_argument(
         "--blocks",
         type=Path,
-        default=Path(
-            "/tmp/lasagna-v2-issue9-entropy-blocks.csv"
-        ),
+        default=Path("/tmp/lasagna-v2-issue9-entropy-blocks.csv"),
     )
 
     parser.add_argument(
         "--buckets",
         type=Path,
-        default=Path(
-            "/tmp/lasagna-v2-issue9-entropy-buckets.csv"
-        ),
+        default=Path("/tmp/lasagna-v2-issue9-entropy-buckets.csv"),
     )
 
     return parser.parse_args()
@@ -1211,21 +916,13 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
 
-    matrix = residuals.load_matrix(
-        args.matrix
-    )
+    matrix = residuals.load_matrix(args.matrix)
 
-    results: list[
-        dict[str, object]
-    ] = []
+    results: list[dict[str, object]] = []
 
-    blocks: list[
-        dict[str, object]
-    ] = []
+    blocks: list[dict[str, object]] = []
 
-    total_cases = (
-        len(matrix) * 2
-    )
+    total_cases = len(matrix) * 2
 
     case_index = 0
 
@@ -1236,13 +933,11 @@ def main() -> None:
         ):
             case_index += 1
 
-            result, case_blocks = (
-                evaluate_stream(
-                    row.evidence_group,
-                    row.dataset,
-                    row.predictor,
-                    base_codec,
-                )
+            result, case_blocks = evaluate_stream(
+                row.evidence_group,
+                row.dataset,
+                row.predictor,
+                base_codec,
             )
 
             results.append(result)
@@ -1266,9 +961,7 @@ def main() -> None:
                 f"{result['deflate_selective_delta']}"
             )
 
-    buckets = summarize_buckets(
-        blocks
-    )
+    buckets = summarize_buckets(blocks)
 
     write_csv(
         args.results,
@@ -1288,27 +981,13 @@ def main() -> None:
         buckets,
     )
 
-    print(
-        f"RESULT_ROWS={len(results)}"
-    )
-    print(
-        f"BLOCK_ROWS={len(blocks)}"
-    )
-    print(
-        f"BUCKET_ROWS={len(buckets)}"
-    )
-    print(
-        f"RESULTS={args.results}"
-    )
-    print(
-        f"BLOCKS={args.blocks}"
-    )
-    print(
-        f"BUCKETS={args.buckets}"
-    )
-    print(
-        "ENTROPY_BENCHMARK_GATE=PASS"
-    )
+    print(f"RESULT_ROWS={len(results)}")
+    print(f"BLOCK_ROWS={len(blocks)}")
+    print(f"BUCKET_ROWS={len(buckets)}")
+    print(f"RESULTS={args.results}")
+    print(f"BLOCKS={args.blocks}")
+    print(f"BUCKETS={args.buckets}")
+    print("ENTROPY_BENCHMARK_GATE=PASS")
 
 
 if __name__ == "__main__":

@@ -5,9 +5,7 @@ from pathlib import Path
 import pytest
 
 
-PATH = Path(
-    "tools/benchmark_entropy_coding.py"
-)
+PATH = Path("tools/benchmark_entropy_coding.py")
 
 SPEC = importlib.util.spec_from_file_location(
     "benchmark_entropy_coding_test",
@@ -17,9 +15,7 @@ SPEC = importlib.util.spec_from_file_location(
 assert SPEC is not None
 assert SPEC.loader is not None
 
-entropy = importlib.util.module_from_spec(
-    SPEC
-)
+entropy = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = entropy
 SPEC.loader.exec_module(entropy)
 
@@ -32,27 +28,15 @@ SPEC.loader.exec_module(entropy)
         b"\x00" * 32,
         bytes(range(32)),
         b"banana banana banana",
-        bytes(
-            value % 7
-            for value in range(128)
-        ),
+        bytes(value % 7 for value in range(128)),
     ],
 )
 def test_huffman_roundtrip(
     payload: bytes,
 ) -> None:
-    encoded = (
-        entropy.encode_huffman_sparse(
-            payload
-        )
-    )
+    encoded = entropy.encode_huffman_sparse(payload)
 
-    assert (
-        entropy.decode_huffman_sparse(
-            encoded
-        )
-        == payload
-    )
+    assert entropy.decode_huffman_sparse(encoded) == payload
 
 
 @pytest.mark.parametrize(
@@ -63,39 +47,23 @@ def test_huffman_roundtrip(
         b"\x00" * 32,
         bytes(range(32)),
         b"banana banana banana",
-        bytes(
-            value % 7
-            for value in range(128)
-        ),
+        bytes(value % 7 for value in range(128)),
     ],
 )
 def test_deflate_roundtrip(
     payload: bytes,
 ) -> None:
-    encoded = (
-        entropy.encode_deflate_raw(
-            payload
-        )
-    )
+    encoded = entropy.encode_deflate_raw(payload)
 
-    assert (
-        entropy.decode_deflate_raw(
-            encoded
-        )
-        == payload
-    )
+    assert entropy.decode_deflate_raw(encoded) == payload
 
 
 def test_huffman_one_symbol_is_deterministic() -> None:
     payload = b"\x07" * 32
 
-    first = entropy.encode_huffman_sparse(
-        payload
-    )
+    first = entropy.encode_huffman_sparse(payload)
 
-    second = entropy.encode_huffman_sparse(
-        payload
-    )
+    second = entropy.encode_huffman_sparse(payload)
 
     assert first == second
 
@@ -123,11 +91,7 @@ def test_huffman_overhead_is_fully_framed() -> None:
         ]
     )
 
-    encoded = (
-        entropy.encode_huffman_sparse(
-            payload
-        )
-    )
+    encoded = entropy.encode_huffman_sparse(payload)
 
     (
         _original_length,
@@ -138,13 +102,7 @@ def test_huffman_overhead_is_fully_framed() -> None:
         0,
     )
 
-    expected = (
-        6
-        + 2 * symbol_count
-        + (
-            bit_length + 7
-        ) // 8
-    )
+    expected = 6 + 2 * symbol_count + (bit_length + 7) // 8
 
     assert len(encoded) == expected
 
@@ -152,11 +110,7 @@ def test_huffman_overhead_is_fully_framed() -> None:
 def test_deflate_overhead_is_fully_framed() -> None:
     payload = b"\x00" * 32
 
-    encoded = (
-        entropy.encode_deflate_raw(
-            payload
-        )
-    )
+    encoded = entropy.encode_deflate_raw(payload)
 
     (
         original_length,
@@ -168,10 +122,7 @@ def test_deflate_overhead_is_fully_framed() -> None:
 
     assert original_length == len(payload)
 
-    assert len(encoded) == (
-        4
-        + compressed_length
-    )
+    assert len(encoded) == (4 + compressed_length)
 
 
 def test_bucket_boundaries() -> None:

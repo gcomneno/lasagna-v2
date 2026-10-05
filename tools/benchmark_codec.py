@@ -159,25 +159,15 @@ def error_metrics(
     reconstructed: Sequence[float],
 ) -> tuple[float, float]:
     if len(original) != len(reconstructed):
-        raise ValueError(
-            f"Length mismatch: {len(original)} != {len(reconstructed)}"
-        )
+        raise ValueError(f"Length mismatch: {len(original)} != {len(reconstructed)}")
 
     if not original:
         return 0.0, 0.0
 
-    squared_errors = [
-        (a - b) ** 2
-        for a, b in zip(original, reconstructed)
-    ]
-    absolute_errors = [
-        abs(a - b)
-        for a, b in zip(original, reconstructed)
-    ]
+    squared_errors = [(a - b) ** 2 for a, b in zip(original, reconstructed)]
+    absolute_errors = [abs(a - b) for a, b in zip(original, reconstructed)]
 
-    rmse = math.sqrt(
-        sum(squared_errors) / len(original)
-    )
+    rmse = math.sqrt(sum(squared_errors) / len(original))
     max_abs_error = max(absolute_errors)
 
     return rmse, max_abs_error
@@ -265,17 +255,9 @@ def make_result(
     encode_time_ms: float,
     decode_time_ms: float,
 ) -> BenchmarkResult:
-    bits_per_sample = (
-        encoded_bytes * 8 / n_samples
-        if n_samples
-        else 0.0
-    )
+    bits_per_sample = encoded_bytes * 8 / n_samples if n_samples else 0.0
 
-    compression_ratio = (
-        raw_bytes / encoded_bytes
-        if encoded_bytes
-        else math.inf
-    )
+    compression_ratio = raw_bytes / encoded_bytes if encoded_bytes else math.inf
 
     return BenchmarkResult(
         dataset=dataset,
@@ -313,8 +295,7 @@ def compress_zstd(raw: bytes) -> bytes:
         ).strip()
 
         raise RuntimeError(
-            "zstd compression failed with status "
-            f"{completed.returncode}: {message}"
+            "zstd compression failed with status " f"{completed.returncode}: {message}"
         )
 
     return completed.stdout
@@ -346,22 +327,15 @@ def decompress_zstd(encoded: bytes) -> bytes:
 
 def project_version() -> str:
     """Read the version declared by the repository under benchmark."""
-    pyproject = (
-        Path(__file__).resolve().parents[1]
-        / "pyproject.toml"
-    )
+    pyproject = Path(__file__).resolve().parents[1] / "pyproject.toml"
 
-    for line in pyproject.read_text(
-        encoding="utf-8"
-    ).splitlines():
+    for line in pyproject.read_text(encoding="utf-8").splitlines():
         stripped = line.strip()
 
         if stripped.startswith("version = "):
             return stripped.split("=", 1)[1].strip().strip('"')
 
-    raise ValueError(
-        "Project version not found in pyproject.toml"
-    )
+    raise ValueError("Project version not found in pyproject.toml")
 
 
 def zstd_version() -> str:
@@ -385,15 +359,11 @@ def encode_gorilla(values: Sequence[float]) -> bytes:
 
     if result["float_format"] != "f64":
         raise ValueError(
-            "Unexpected Gorilla float format "
-            f"{result['float_format']!r}"
+            "Unexpected Gorilla float format " f"{result['float_format']!r}"
         )
 
     if result["nb_values"] != len(values):
-        raise ValueError(
-            "Unexpected Gorilla sample count "
-            f"{result['nb_values']}"
-        )
+        raise ValueError("Unexpected Gorilla sample count " f"{result['nb_values']}")
 
     return (
         GORILLA_HEADER_STRUCT.pack(
@@ -410,24 +380,18 @@ def decode_gorilla(encoded: bytes) -> list[float]:
     if len(encoded) < GORILLA_HEADER_STRUCT.size:
         raise ValueError("Truncated Gorilla benchmark frame")
 
-    magic, nb_values, float_format = (
-        GORILLA_HEADER_STRUCT.unpack_from(
-            encoded,
-            0,
-        )
+    magic, nb_values, float_format = GORILLA_HEADER_STRUCT.unpack_from(
+        encoded,
+        0,
     )
 
     if magic != GORILLA_MAGIC:
         raise ValueError("Invalid Gorilla benchmark magic")
 
     if float_format != GORILLA_FLOAT_FORMAT:
-        raise ValueError(
-            "Unsupported Gorilla benchmark float format"
-        )
+        raise ValueError("Unsupported Gorilla benchmark float format")
 
-    payload = encoded[
-        GORILLA_HEADER_STRUCT.size :
-    ]
+    payload = encoded[GORILLA_HEADER_STRUCT.size :]
 
     decoded = gc.ValuesDecoder.decode_all(
         {
@@ -438,9 +402,7 @@ def decode_gorilla(encoded: bytes) -> list[float]:
     )
 
     if len(decoded) != nb_values:
-        raise ValueError(
-            "Decoded Gorilla sample count mismatch"
-        )
+        raise ValueError("Decoded Gorilla sample count mismatch")
 
     return list(decoded)
 
@@ -460,12 +422,10 @@ def _append_lossless_result(
     repetitions: int,
     warmup: int,
 ) -> None:
-    encoded, encode_time_ms = (
-        _measure_deterministic_encode(
-            encode,
-            repetitions=repetitions,
-            warmup=warmup,
-        )
+    encoded, encode_time_ms = _measure_deterministic_encode(
+        encode,
+        repetitions=repetitions,
+        warmup=warmup,
     )
 
     reconstructed, decode_time_ms = _median_call_ms(
@@ -480,9 +440,7 @@ def _append_lossless_result(
     )
 
     if rmse != 0.0 or max_abs_error != 0.0:
-        raise ValueError(
-            f"Lossless codec {codec} did not reconstruct exactly"
-        )
+        raise ValueError(f"Lossless codec {codec} did not reconstruct exactly")
 
     results.append(
         make_result(
@@ -547,9 +505,7 @@ def benchmark_dataset(
             compresslevel=9,
             mtime=0,
         ),
-        decode=lambda encoded: decode_canonical_float64(
-            gzip.decompress(encoded)
-        ),
+        decode=lambda encoded: decode_canonical_float64(gzip.decompress(encoded)),
         repetitions=repetitions,
         warmup=warmup,
     )
@@ -566,9 +522,7 @@ def benchmark_dataset(
         values=values,
         raw_bytes=raw_bytes,
         encode=lambda: compress_zstd(raw),
-        decode=lambda encoded: decode_canonical_float64(
-            decompress_zstd(encoded)
-        ),
+        decode=lambda encoded: decode_canonical_float64(decompress_zstd(encoded)),
         repetitions=repetitions,
         warmup=warmup,
     )
@@ -578,9 +532,7 @@ def benchmark_dataset(
         dataset=dataset,
         codec="gorilla",
         implementation="gorillacompression",
-        implementation_version=importlib.metadata.version(
-            "gorillacompression"
-        ),
+        implementation_version=importlib.metadata.version("gorillacompression"),
         configuration="values_only_f64_canonical_frame",
         values=values,
         raw_bytes=raw_bytes,
@@ -600,6 +552,7 @@ def benchmark_dataset(
     lasagna_version = project_version()
 
     for config in configs:
+
         def encode_lasagna(
             config: CodecConfig = config,
         ) -> bytes:
@@ -616,12 +569,10 @@ def benchmark_dataset(
                 residual_coding=config.residual_coding,
             )
 
-        encoded, encode_time_ms = (
-            _measure_deterministic_encode(
-                encode_lasagna,
-                repetitions=repetitions,
-                warmup=warmup,
-            )
+        encoded, encode_time_ms = _measure_deterministic_encode(
+            encode_lasagna,
+            repetitions=repetitions,
+            warmup=warmup,
         )
 
         decoded, decode_time_ms = _median_call_ms(
@@ -680,22 +631,12 @@ def write_results_csv(
                 "n_samples": result.n_samples,
                 "raw_bytes": result.raw_bytes,
                 "encoded_bytes": result.encoded_bytes,
-                "bits_per_sample": (
-                    f"{result.bits_per_sample:.9f}"
-                ),
-                "compression_ratio": (
-                    f"{result.compression_ratio:.9f}"
-                ),
+                "bits_per_sample": (f"{result.bits_per_sample:.9f}"),
+                "compression_ratio": (f"{result.compression_ratio:.9f}"),
                 "rmse": f"{result.rmse:.12g}",
-                "max_abs_error": (
-                    f"{result.max_abs_error:.12g}"
-                ),
-                "encode_time_ms": (
-                    f"{result.encode_time_ms:.9f}"
-                ),
-                "decode_time_ms": (
-                    f"{result.decode_time_ms:.9f}"
-                ),
+                "max_abs_error": (f"{result.max_abs_error:.12g}"),
+                "encode_time_ms": (f"{result.encode_time_ms:.9f}"),
+                "decode_time_ms": (f"{result.decode_time_ms:.9f}"),
             }
         )
 
@@ -703,8 +644,7 @@ def write_results_csv(
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
-            "Benchmark Lasagna V2 against explicit "
-            "lossless codec baselines."
+            "Benchmark Lasagna V2 against explicit " "lossless codec baselines."
         )
     )
 

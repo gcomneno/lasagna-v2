@@ -7,7 +7,6 @@ import argparse
 import csv
 import importlib.util
 import statistics
-import struct
 import sys
 import time
 from pathlib import Path
@@ -21,8 +20,8 @@ for import_path in (ROOT, TOOLS):
     if value not in sys.path:
         sys.path.insert(0, value)
 
-from lasagna2 import core
-from benchmark_codec import load_csv_values
+from lasagna2 import core  # noqa: E402
+from benchmark_codec import load_csv_values  # noqa: E402
 
 
 ZERO_RUN_MIN_LENGTH = 3
@@ -76,9 +75,7 @@ def load_distribution_module():
     )
 
     if spec is None or spec.loader is None:
-        raise RuntimeError(
-            "Unable to load residual distribution module"
-        )
+        raise RuntimeError("Unable to load residual distribution module")
 
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
@@ -99,28 +96,18 @@ def encode_zero_run_varint(
         if values[index] == 0:
             run_end = index + 1
 
-            while (
-                run_end < len(values)
-                and values[run_end] == 0
-            ):
+            while run_end < len(values) and values[run_end] == 0:
                 run_end += 1
 
             run_length = run_end - index
 
             if run_length >= ZERO_RUN_MIN_LENGTH:
                 out += core._encode_varint(0)
-                out += core._encode_varint(
-                    run_length
-                )
+                out += core._encode_varint(run_length)
                 index = run_end
                 continue
 
-        token = (
-            core.zigzag_encode(
-                int(values[index])
-            )
-            + 1
-        )
+        token = core.zigzag_encode(int(values[index])) + 1
 
         out += core._encode_varint(token)
         index += 1
@@ -142,46 +129,29 @@ def decode_zero_run_varint(
         )
 
         if token == 0:
-            run_length, offset = (
-                core._decode_varint(
-                    data,
-                    offset,
-                )
+            run_length, offset = core._decode_varint(
+                data,
+                offset,
             )
 
             if run_length < ZERO_RUN_MIN_LENGTH:
-                raise ValueError(
-                    "Invalid zero-run length"
-                )
+                raise ValueError("Invalid zero-run length")
 
-            if (
-                len(values) + run_length
-                > expected_count
-            ):
-                raise ValueError(
-                    "Zero-run exceeds declared residual count"
-                )
+            if len(values) + run_length > expected_count:
+                raise ValueError("Zero-run exceeds declared residual count")
 
-            values.extend(
-                [0] * run_length
-            )
+            values.extend([0] * run_length)
 
         else:
-            value = core.zigzag_decode(
-                token - 1
-            )
+            value = core.zigzag_decode(token - 1)
 
             values.append(value)
 
             if len(values) > expected_count:
-                raise ValueError(
-                    "Decoded residual count exceeds declaration"
-                )
+                raise ValueError("Decoded residual count exceeds declaration")
 
     if len(values) != expected_count:
-        raise ValueError(
-            "Decoded residual count does not match declaration"
-        )
+        raise ValueError("Decoded residual count does not match declaration")
 
     return values
 
@@ -189,12 +159,7 @@ def decode_zero_run_varint(
 def encode_varint_blocks(
     blocks: list[list[int]],
 ) -> list[bytes]:
-    return [
-        core.encode_int_list_varint(
-            block
-        )
-        for block in blocks
-    ]
+    return [core.encode_int_list_varint(block) for block in blocks]
 
 
 def decode_varint_blocks(
@@ -216,10 +181,7 @@ def decode_varint_blocks(
 def encode_zero_run_blocks(
     blocks: list[list[int]],
 ) -> list[bytes]:
-    return [
-        encode_zero_run_varint(block)
-        for block in blocks
-    ]
+    return [encode_zero_run_varint(block) for block in blocks]
 
 
 def decode_zero_run_blocks(
@@ -249,10 +211,7 @@ def median_runtime_ms(
     for _ in range(BENCHMARK_RUNS):
         start = time.perf_counter_ns()
         operation()
-        elapsed = (
-            time.perf_counter_ns()
-            - start
-        ) / 1_000_000.0
+        elapsed = (time.perf_counter_ns() - start) / 1_000_000.0
         timings.append(elapsed)
 
     return statistics.median(timings)
@@ -292,65 +251,44 @@ def evaluate_stream(
 ) -> dict[str, object]:
     values = load_csv_values(dataset)
 
-    _segments, blocks = (
-        distribution.build_v2_residual_stream(
-            values,
-            predictor,
+    _segments, blocks = distribution.build_v2_residual_stream(
+        values,
+        predictor,
+    )
+
+    lengths = [len(block) for block in blocks]
+
+    varint_payloads = encode_varint_blocks(blocks)
+
+    zero_run_payloads = encode_zero_run_blocks(blocks)
+
+    if (
+        decode_varint_blocks(
+            varint_payloads,
+            lengths,
         )
-    )
+        != blocks
+    ):
+        raise ValueError("Varint roundtrip mismatch")
 
-    lengths = [
-        len(block)
-        for block in blocks
-    ]
-
-    varint_payloads = encode_varint_blocks(
-        blocks
-    )
-
-    zero_run_payloads = (
-        encode_zero_run_blocks(
-            blocks
+    if (
+        decode_zero_run_blocks(
+            zero_run_payloads,
+            lengths,
         )
-    )
+        != blocks
+    ):
+        raise ValueError("Zero-run roundtrip mismatch")
 
-    if decode_varint_blocks(
-        varint_payloads,
-        lengths,
-    ) != blocks:
-        raise ValueError(
-            "Varint roundtrip mismatch"
-        )
+    varint_sizes = [len(payload) for payload in varint_payloads]
 
-    if decode_zero_run_blocks(
-        zero_run_payloads,
-        lengths,
-    ) != blocks:
-        raise ValueError(
-            "Zero-run roundtrip mismatch"
-        )
+    zero_run_sizes = [len(payload) for payload in zero_run_payloads]
 
-    varint_sizes = [
-        len(payload)
-        for payload in varint_payloads
-    ]
+    raw_payload_bytes = 4 * sum(lengths)
 
-    zero_run_sizes = [
-        len(payload)
-        for payload in zero_run_payloads
-    ]
+    varint_payload_bytes = sum(varint_sizes)
 
-    raw_payload_bytes = (
-        4 * sum(lengths)
-    )
-
-    varint_payload_bytes = sum(
-        varint_sizes
-    )
-
-    zero_run_payload_bytes = sum(
-        zero_run_sizes
-    )
+    zero_run_payload_bytes = sum(zero_run_sizes)
 
     smaller = sum(
         zero < varint
@@ -386,33 +324,18 @@ def evaluate_stream(
 
     selector_bytes = len(blocks)
 
-    hybrid_payload = (
-        hybrid_gross
-        + selector_bytes
-    )
+    hybrid_payload = hybrid_gross + selector_bytes
 
     current_total = current_v2_total_bytes(
         values,
         predictor,
     )
 
-    projected_zero_total = (
-        current_total
-        - varint_payload_bytes
-        + zero_run_payload_bytes
-    )
+    projected_zero_total = current_total - varint_payload_bytes + zero_run_payload_bytes
 
-    projected_hybrid_total = (
-        current_total
-        - varint_payload_bytes
-        + hybrid_payload
-    )
+    projected_hybrid_total = current_total - varint_payload_bytes + hybrid_payload
 
-    varint_encode_ms = median_runtime_ms(
-        lambda: encode_varint_blocks(
-            blocks
-        )
-    )
+    varint_encode_ms = median_runtime_ms(lambda: encode_varint_blocks(blocks))
 
     varint_decode_ms = median_runtime_ms(
         lambda: decode_varint_blocks(
@@ -421,11 +344,7 @@ def evaluate_stream(
         )
     )
 
-    zero_run_encode_ms = median_runtime_ms(
-        lambda: encode_zero_run_blocks(
-            blocks
-        )
-    )
+    zero_run_encode_ms = median_runtime_ms(lambda: encode_zero_run_blocks(blocks))
 
     zero_run_decode_ms = median_runtime_ms(
         lambda: decode_zero_run_blocks(
@@ -440,95 +359,42 @@ def evaluate_stream(
         "predictor": predictor,
         "n_samples": len(values),
         "segment_count": len(blocks),
-        "raw_payload_bytes": (
-            raw_payload_bytes
-        ),
-        "varint_payload_bytes": (
-            varint_payload_bytes
-        ),
-        "zero_run_payload_bytes": (
-            zero_run_payload_bytes
-        ),
-        "zero_run_delta_vs_varint": (
-            zero_run_payload_bytes
-            - varint_payload_bytes
-        ),
+        "raw_payload_bytes": (raw_payload_bytes),
+        "varint_payload_bytes": (varint_payload_bytes),
+        "zero_run_payload_bytes": (zero_run_payload_bytes),
+        "zero_run_delta_vs_varint": (zero_run_payload_bytes - varint_payload_bytes),
         "zero_run_smaller_blocks": smaller,
         "zero_run_tie_blocks": ties,
         "zero_run_larger_blocks": larger,
-        "hybrid_gross_payload_bytes": (
-            hybrid_gross
-        ),
-        "hybrid_selector_bytes": (
-            selector_bytes
-        ),
-        "hybrid_payload_bytes": (
-            hybrid_payload
-        ),
-        "hybrid_delta_vs_varint": (
-            hybrid_payload
-            - varint_payload_bytes
-        ),
-        "current_v2_varint_total_bytes": (
-            current_total
-        ),
-        "projected_v2_zero_run_total_bytes": (
-            projected_zero_total
-        ),
-        "projected_v2_hybrid_total_bytes": (
-            projected_hybrid_total
-        ),
-        "zero_run_total_delta": (
-            projected_zero_total
-            - current_total
-        ),
-        "hybrid_total_delta": (
-            projected_hybrid_total
-            - current_total
-        ),
-        "varint_encode_median_ms": (
-            varint_encode_ms
-        ),
-        "varint_decode_median_ms": (
-            varint_decode_ms
-        ),
-        "zero_run_encode_median_ms": (
-            zero_run_encode_ms
-        ),
-        "zero_run_decode_median_ms": (
-            zero_run_decode_ms
-        ),
+        "hybrid_gross_payload_bytes": (hybrid_gross),
+        "hybrid_selector_bytes": (selector_bytes),
+        "hybrid_payload_bytes": (hybrid_payload),
+        "hybrid_delta_vs_varint": (hybrid_payload - varint_payload_bytes),
+        "current_v2_varint_total_bytes": (current_total),
+        "projected_v2_zero_run_total_bytes": (projected_zero_total),
+        "projected_v2_hybrid_total_bytes": (projected_hybrid_total),
+        "zero_run_total_delta": (projected_zero_total - current_total),
+        "hybrid_total_delta": (projected_hybrid_total - current_total),
+        "varint_encode_median_ms": (varint_encode_ms),
+        "varint_decode_median_ms": (varint_decode_ms),
+        "zero_run_encode_median_ms": (zero_run_encode_ms),
+        "zero_run_decode_median_ms": (zero_run_decode_ms),
     }
 
 
 def worst_case_streams() -> dict[str, list[int]]:
     return {
         "all_zero": [0] * 128,
-        "alternating_zero_nonzero": (
-            [0, 1] * 64
-        ),
-        "no_zero_small": [
-            1 if index % 2 == 0 else -1
-            for index in range(128)
-        ],
-        "isolated_zero": [
-            0 if index % 8 == 0 else 1
-            for index in range(128)
-        ],
-        "long_zero_run": (
-            [1] * 8
-            + [0] * 112
-            + [-1] * 8
-        ),
+        "alternating_zero_nonzero": ([0, 1] * 64),
+        "no_zero_small": [1 if index % 2 == 0 else -1 for index in range(128)],
+        "isolated_zero": [0 if index % 8 == 0 else 1 for index in range(128)],
+        "long_zero_run": ([1] * 8 + [0] * 112 + [-1] * 8),
         "boundary_positive_63": [63] * 128,
         "boundary_negative_64": [-64] * 128,
         "boundary_positive_64": [64] * 128,
         "boundary_negative_65": [-65] * 128,
         "large_signed": [
-            2**31 - 1
-            if index % 2 == 0
-            else -(2**31)
-            for index in range(128)
+            2**31 - 1 if index % 2 == 0 else -(2**31) for index in range(128)
         ],
     }
 
@@ -536,20 +402,10 @@ def worst_case_streams() -> dict[str, list[int]]:
 def evaluate_worst_cases() -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
 
-    for name, values in (
-        worst_case_streams().items()
-    ):
-        varint_payload = (
-            core.encode_int_list_varint(
-                values
-            )
-        )
+    for name, values in worst_case_streams().items():
+        varint_payload = core.encode_int_list_varint(values)
 
-        zero_run_payload = (
-            encode_zero_run_varint(
-                values
-            )
-        )
+        zero_run_payload = encode_zero_run_varint(values)
 
         decoded = decode_zero_run_varint(
             zero_run_payload,
@@ -557,17 +413,11 @@ def evaluate_worst_cases() -> list[dict[str, object]]:
         )
 
         if decoded != values:
-            raise ValueError(
-                f"Worst-case roundtrip mismatch: {name}"
-            )
+            raise ValueError(f"Worst-case roundtrip mismatch: {name}")
 
-        varint_bytes = len(
-            varint_payload
-        )
+        varint_bytes = len(varint_payload)
 
-        zero_run_bytes = len(
-            zero_run_payload
-        )
+        zero_run_bytes = len(zero_run_payload)
 
         rows.append(
             {
@@ -575,14 +425,8 @@ def evaluate_worst_cases() -> list[dict[str, object]]:
                 "residual_count": len(values),
                 "varint_bytes": varint_bytes,
                 "zero_run_bytes": zero_run_bytes,
-                "delta_bytes": (
-                    zero_run_bytes
-                    - varint_bytes
-                ),
-                "ratio_vs_varint": (
-                    zero_run_bytes
-                    / varint_bytes
-                ),
+                "delta_bytes": (zero_run_bytes - varint_bytes),
+                "ratio_vs_varint": (zero_run_bytes / varint_bytes),
             }
         )
 
@@ -618,25 +462,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--matrix",
         type=Path,
-        default=Path(
-            "docs/residual-distribution-matrix.tsv"
-        ),
+        default=Path("docs/residual-distribution-matrix.tsv"),
     )
 
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path(
-            "/tmp/lasagna-v2-issue8-codecs.csv"
-        ),
+        default=Path("/tmp/lasagna-v2-issue8-codecs.csv"),
     )
 
     parser.add_argument(
         "--worst-case-output",
         type=Path,
-        default=Path(
-            "/tmp/lasagna-v2-issue8-codec-worst-cases.csv"
-        ),
+        default=Path("/tmp/lasagna-v2-issue8-codec-worst-cases.csv"),
     )
 
     return parser.parse_args()
@@ -645,15 +483,9 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
 
-    matrix = (
-        distribution.load_matrix(
-            args.matrix
-        )
-    )
+    matrix = distribution.load_matrix(args.matrix)
 
-    rows: list[
-        dict[str, object]
-    ] = []
+    rows: list[dict[str, object]] = []
 
     for index, row in enumerate(
         matrix,
@@ -680,9 +512,7 @@ def main() -> None:
             f"{result['zero_run_smaller_blocks']}"
         )
 
-    worst_rows = (
-        evaluate_worst_cases()
-    )
+    worst_rows = evaluate_worst_cases()
 
     write_csv(
         args.output,
@@ -696,22 +526,11 @@ def main() -> None:
         worst_rows,
     )
 
-    print(
-        f"RESULT_ROWS={len(rows)}"
-    )
-    print(
-        f"WORST_CASE_ROWS={len(worst_rows)}"
-    )
-    print(
-        f"OUTPUT={args.output}"
-    )
-    print(
-        f"WORST_CASE_OUTPUT="
-        f"{args.worst_case_output}"
-    )
-    print(
-        "RESIDUAL_CODEC_BENCHMARK_GATE=PASS"
-    )
+    print(f"RESULT_ROWS={len(rows)}")
+    print(f"WORST_CASE_ROWS={len(worst_rows)}")
+    print(f"OUTPUT={args.output}")
+    print(f"WORST_CASE_OUTPUT=" f"{args.worst_case_output}")
+    print("RESIDUAL_CODEC_BENCHMARK_GATE=PASS")
 
 
 if __name__ == "__main__":

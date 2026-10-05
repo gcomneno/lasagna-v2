@@ -26,9 +26,7 @@ SPEC.loader.exec_module(benchmark_codec)
 def test_canonical_float64_bytes_size() -> None:
     values = [0.0, 1.0, -2.5, math.pi]
 
-    raw = benchmark_codec.canonical_float64_bytes(
-        values
-    )
+    raw = benchmark_codec.canonical_float64_bytes(values)
 
     assert len(raw) == len(values) * 8
 
@@ -36,11 +34,9 @@ def test_canonical_float64_bytes_size() -> None:
 def test_error_metrics_exact_roundtrip() -> None:
     values = [0.0, 1.0, -2.5, math.pi]
 
-    rmse, max_abs_error = (
-        benchmark_codec.error_metrics(
-            values,
-            values,
-        )
+    rmse, max_abs_error = benchmark_codec.error_metrics(
+        values,
+        values,
     )
 
     assert rmse == 0.0
@@ -56,12 +52,8 @@ def test_gorilla_frame_is_deterministic_and_lossless() -> None:
         math.pi,
     ]
 
-    encoded_a = benchmark_codec.encode_gorilla(
-        values
-    )
-    encoded_b = benchmark_codec.encode_gorilla(
-        values
-    )
+    encoded_a = benchmark_codec.encode_gorilla(values)
+    encoded_b = benchmark_codec.encode_gorilla(values)
 
     assert encoded_a == encoded_b
 
@@ -76,14 +68,9 @@ def test_gorilla_frame_is_deterministic_and_lossless() -> None:
 
     assert magic == benchmark_codec.GORILLA_MAGIC
     assert nb_values == len(values)
-    assert (
-        float_format
-        == benchmark_codec.GORILLA_FLOAT_FORMAT
-    )
+    assert float_format == benchmark_codec.GORILLA_FLOAT_FORMAT
 
-    decoded = benchmark_codec.decode_gorilla(
-        encoded_a
-    )
+    decoded = benchmark_codec.decode_gorilla(encoded_a)
 
     assert len(decoded) == len(values)
 
@@ -101,12 +88,7 @@ def test_gorilla_frame_is_deterministic_and_lossless() -> None:
 
 
 def test_benchmark_trend_contains_expected_matrix() -> None:
-    dataset = (
-        ROOT
-        / "data"
-        / "examples"
-        / "trend.csv"
-    )
+    dataset = ROOT / "data" / "examples" / "trend.csv"
 
     results = benchmark_codec.benchmark_dataset(
         dataset,
@@ -120,10 +102,7 @@ def test_benchmark_trend_contains_expected_matrix() -> None:
     assert results[0].encoded_bytes == 200 * 8
     assert results[0].rmse == 0.0
 
-    codecs = [
-        result.codec
-        for result in results
-    ]
+    codecs = [result.codec for result in results]
 
     assert codecs.count("raw") == 1
     assert codecs.count("gzip") == 1
@@ -132,15 +111,10 @@ def test_benchmark_trend_contains_expected_matrix() -> None:
     assert codecs.count("lasagna") == 10
 
     configurations = {
-        result.configuration
-        for result in results
-        if result.codec == "lasagna"
+        result.configuration for result in results if result.codec == "lasagna"
     }
 
-    assert configurations == {
-        config.name
-        for config in benchmark_codec.LASAGNA_CONFIGS
-    }
+    assert configurations == {config.name for config in benchmark_codec.LASAGNA_CONFIGS}
 
     for result in results:
         assert result.n_samples == 200

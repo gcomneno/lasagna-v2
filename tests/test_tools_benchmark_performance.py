@@ -14,13 +14,9 @@ SPEC = importlib.util.spec_from_file_location(
 )
 
 if SPEC is None or SPEC.loader is None:
-    raise RuntimeError(
-        "Unable to load benchmark_performance"
-    )
+    raise RuntimeError("Unable to load benchmark_performance")
 
-benchmark_performance = importlib.util.module_from_spec(
-    SPEC
-)
+benchmark_performance = importlib.util.module_from_spec(SPEC)
 
 sys.modules[SPEC.name] = benchmark_performance
 SPEC.loader.exec_module(benchmark_performance)
@@ -52,40 +48,24 @@ def test_signal_generation_is_deterministic(
 
 def test_frozen_performance_matrix_shape() -> None:
     cases = benchmark_performance.load_matrix(
-        ROOT
-        / "docs"
-        / "performance-benchmark-matrix.tsv"
+        ROOT / "docs" / "performance-benchmark-matrix.tsv"
     )
 
     assert len(cases) == 15
     assert len(set(cases)) == 15
 
-    v2 = [
-        case
-        for case in cases
-        if case.codec == "v2"
-    ]
-    v1 = [
-        case
-        for case in cases
-        if case.codec == "v1"
-    ]
+    v2 = [case for case in cases if case.codec == "v2"]
+    v1 = [case for case in cases if case.codec == "v1"]
 
     assert len(v2) == 9
     assert len(v1) == 6
 
 
 def test_throughput_uses_float64_raw_size() -> None:
-    samples_per_second, mib_per_second = (
-        benchmark_performance.throughput(
-            1_048_576,
-            1000.0,
-        )
+    samples_per_second, mib_per_second = benchmark_performance.throughput(
+        1_048_576,
+        1000.0,
     )
 
-    assert samples_per_second == pytest.approx(
-        1_048_576.0
-    )
-    assert mib_per_second == pytest.approx(
-        8.0
-    )
+    assert samples_per_second == pytest.approx(1_048_576.0)
+    assert mib_per_second == pytest.approx(8.0)

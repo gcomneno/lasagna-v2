@@ -25,8 +25,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from lasagna2.cli import read_lsg2_metadata_and_segments
-from lasagna2.core import (
+from lasagna2.cli import read_lsg2_metadata_and_segments  # noqa: E402
+from lasagna2.core import (  # noqa: E402
     TimeSeries,
     decode_timeseries,
     encode_timeseries_v1,
@@ -66,9 +66,7 @@ class MatrixCase:
 def project_version() -> str:
     pyproject = ROOT / "pyproject.toml"
 
-    for line in pyproject.read_text(
-        encoding="utf-8"
-    ).splitlines():
+    for line in pyproject.read_text(encoding="utf-8").splitlines():
         if line.startswith("version = "):
             return line.split("=", 1)[1].strip().strip('"')
 
@@ -85,10 +83,7 @@ def generate_signal(
         raise ValueError("n_samples must be >= 1")
 
     if signal == "trend":
-        return [
-            10.0 + 0.005 * index
-            for index in range(n_samples)
-        ]
+        return [10.0 + 0.005 * index for index in range(n_samples)]
 
     if signal == "sine_noise":
         rng = random.Random(seed)
@@ -97,10 +92,7 @@ def generate_signal(
             (
                 10.0
                 + 0.0005 * index
-                + 4.0
-                * math.sin(
-                    2.0 * math.pi * index / 240.0
-                )
+                + 4.0 * math.sin(2.0 * math.pi * index / 240.0)
                 + rng.gauss(0.0, 0.15)
             )
             for index in range(n_samples)
@@ -115,21 +107,9 @@ def generate_signal(
             if phase < 1024:
                 value = 20.0
             elif phase < 2048:
-                value = (
-                    20.0
-                    + (phase - 1024) * 0.02
-                )
+                value = 20.0 + (phase - 1024) * 0.02
             elif phase < 3072:
-                value = (
-                    40.48
-                    + 5.0
-                    * math.sin(
-                        2.0
-                        * math.pi
-                        * (phase - 2048)
-                        / 128.0
-                    )
-                )
+                value = 40.48 + 5.0 * math.sin(2.0 * math.pi * (phase - 2048) / 128.0)
             else:
                 value = 25.0
 
@@ -140,9 +120,7 @@ def generate_signal(
 
         return values
 
-    raise ValueError(
-        f"Unknown signal family: {signal}"
-    )
+    raise ValueError(f"Unknown signal family: {signal}")
 
 
 def make_timeseries(
@@ -189,9 +167,7 @@ def encode_case(
             **common,
         )
 
-    raise ValueError(
-        f"Unknown codec: {codec}"
-    )
+    raise ValueError(f"Unknown codec: {codec}")
 
 
 def median_call_ms(
@@ -201,14 +177,10 @@ def median_call_ms(
     warmup: int,
 ) -> tuple[T, float]:
     if repetitions < 1:
-        raise ValueError(
-            "repetitions must be >= 1"
-        )
+        raise ValueError("repetitions must be >= 1")
 
     if warmup < 0:
-        raise ValueError(
-            "warmup must be >= 0"
-        )
+        raise ValueError("warmup must be >= 0")
 
     for _ in range(warmup):
         operation()
@@ -226,8 +198,7 @@ def median_call_ms(
 
     return (
         values[-1],
-        statistics.median(elapsed_ns)
-        / 1_000_000.0,
+        statistics.median(elapsed_ns) / 1_000_000.0,
     )
 
 
@@ -251,21 +222,16 @@ def deterministic_encode_ms(
         if first is None:
             first = encoded
         elif encoded != first:
-            raise ValueError(
-                "Non-deterministic encoded output"
-            )
+            raise ValueError("Non-deterministic encoded output")
 
         elapsed_ns.append(end - start)
 
     if first is None:
-        raise ValueError(
-            "No timed encode result produced"
-        )
+        raise ValueError("No timed encode result produced")
 
     return (
         first,
-        statistics.median(elapsed_ns)
-        / 1_000_000.0,
+        statistics.median(elapsed_ns) / 1_000_000.0,
     )
 
 
@@ -287,22 +253,16 @@ def load_matrix(
         MatrixCase(
             codec=row["codec"],
             signal=row["signal"],
-            n_samples=int(
-                row["n_samples"]
-            ),
+            n_samples=int(row["n_samples"]),
         )
         for row in rows
     ]
 
     if not cases:
-        raise ValueError(
-            "Benchmark matrix is empty"
-        )
+        raise ValueError("Benchmark matrix is empty")
 
     if len(cases) != len(set(cases)):
-        raise ValueError(
-            "Benchmark matrix contains duplicates"
-        )
+        raise ValueError("Benchmark matrix contains duplicates")
 
     return cases
 
@@ -316,14 +276,9 @@ def throughput(
     if seconds <= 0.0:
         return math.inf, math.inf
 
-    samples_per_second = (
-        n_samples / seconds
-    )
+    samples_per_second = n_samples / seconds
 
-    raw_mib = (
-        n_samples * 8
-        / (1024.0 * 1024.0)
-    )
+    raw_mib = n_samples * 8 / (1024.0 * 1024.0)
 
     return (
         samples_per_second,
@@ -361,22 +316,13 @@ def run_memory_worker(
     )
 
     if completed.returncode != 0:
-        raise RuntimeError(
-            "Memory worker failed: "
-            + completed.stderr.strip()
-        )
+        raise RuntimeError("Memory worker failed: " + completed.stderr.strip())
 
-    payload = json.loads(
-        completed.stdout.strip()
-    )
+    payload = json.loads(completed.stdout.strip())
 
     return {
-        "traced_peak_bytes": int(
-            payload["traced_peak_bytes"]
-        ),
-        "peak_rss_kib": int(
-            payload["peak_rss_kib"]
-        ),
+        "traced_peak_bytes": int(payload["traced_peak_bytes"]),
+        "peak_rss_kib": int(payload["peak_rss_kib"]),
     }
 
 
@@ -400,16 +346,12 @@ def memory_worker(
             ts,
         )
 
-        _current, peak = (
-            tracemalloc.get_traced_memory()
-        )
+        _current, peak = tracemalloc.get_traced_memory()
         tracemalloc.stop()
 
         # Keep the result alive until after peak capture.
         if not encoded:
-            raise ValueError(
-                "Encode produced empty output"
-            )
+            raise ValueError("Encode produced empty output")
 
     elif operation == "decode":
         encoded = encode_case(
@@ -419,28 +361,18 @@ def memory_worker(
 
         tracemalloc.start()
 
-        decoded = decode_timeseries(
-            encoded
-        )
+        decoded = decode_timeseries(encoded)
 
-        _current, peak = (
-            tracemalloc.get_traced_memory()
-        )
+        _current, peak = tracemalloc.get_traced_memory()
         tracemalloc.stop()
 
         if len(decoded.values) != n_samples:
-            raise ValueError(
-                "Decode sample count mismatch"
-            )
+            raise ValueError("Decode sample count mismatch")
 
     else:
-        raise ValueError(
-            f"Unknown memory operation: {operation}"
-        )
+        raise ValueError(f"Unknown memory operation: {operation}")
 
-    peak_rss_kib = resource.getrusage(
-        resource.RUSAGE_SELF
-    ).ru_maxrss
+    peak_rss_kib = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
 
     print(
         json.dumps(
@@ -476,31 +408,23 @@ def timing_worker(
     )
 
     decoded, decode_ms = median_call_ms(
-        lambda: decode_timeseries(
-            encoded
-        ),
+        lambda: decode_timeseries(encoded),
         repetitions=repetitions,
         warmup=warmup,
     )
 
     if len(decoded.values) != n_samples:
-        raise ValueError(
-            "Decoded sample count mismatch"
-        )
+        raise ValueError("Decoded sample count mismatch")
 
     (
         _context,
         n_points,
         segments,
         _coding_type,
-    ) = read_lsg2_metadata_and_segments(
-        encoded
-    )
+    ) = read_lsg2_metadata_and_segments(encoded)
 
     if n_points != n_samples:
-        raise ValueError(
-            "Encoded sample count mismatch"
-        )
+        raise ValueError("Encoded sample count mismatch")
 
     print(
         json.dumps(
@@ -549,14 +473,9 @@ def run_timing_worker(
     )
 
     if completed.returncode != 0:
-        raise RuntimeError(
-            "Timing worker failed: "
-            + completed.stderr.strip()
-        )
+        raise RuntimeError("Timing worker failed: " + completed.stderr.strip())
 
-    return json.loads(
-        completed.stdout.strip()
-    )
+    return json.loads(completed.stdout.strip())
 
 
 def evaluate_case(
@@ -587,12 +506,8 @@ def evaluate_case(
         n_samples=case.n_samples,
     )
 
-    encode_ms = float(
-        timing["encode_median_ms"]
-    )
-    decode_ms = float(
-        timing["decode_median_ms"]
-    )
+    encode_ms = float(timing["encode_median_ms"])
+    decode_ms = float(timing["decode_median_ms"])
 
     (
         encode_samples_per_second,
@@ -614,64 +529,30 @@ def evaluate_case(
         "codec": case.codec,
         "signal": case.signal,
         "n_samples": case.n_samples,
-        "segment_count": int(
-            timing["segment_count"]
-        ),
-        "encoded_bytes": int(
-            timing["encoded_bytes"]
-        ),
+        "segment_count": int(timing["segment_count"]),
+        "encoded_bytes": int(timing["encoded_bytes"]),
         "encode_median_ms": encode_ms,
         "decode_median_ms": decode_ms,
-        "encode_samples_per_second": (
-            encode_samples_per_second
-        ),
-        "decode_samples_per_second": (
-            decode_samples_per_second
-        ),
-        "encode_raw_mib_per_second": (
-            encode_raw_mib_per_second
-        ),
-        "decode_raw_mib_per_second": (
-            decode_raw_mib_per_second
-        ),
-        "encode_traced_peak_bytes": (
-            encode_memory[
-                "traced_peak_bytes"
-            ]
-        ),
-        "decode_traced_peak_bytes": (
-            decode_memory[
-                "traced_peak_bytes"
-            ]
-        ),
-        "encode_peak_rss_kib": (
-            encode_memory[
-                "peak_rss_kib"
-            ]
-        ),
-        "decode_peak_rss_kib": (
-            decode_memory[
-                "peak_rss_kib"
-            ]
-        ),
+        "encode_samples_per_second": (encode_samples_per_second),
+        "decode_samples_per_second": (decode_samples_per_second),
+        "encode_raw_mib_per_second": (encode_raw_mib_per_second),
+        "decode_raw_mib_per_second": (decode_raw_mib_per_second),
+        "encode_traced_peak_bytes": (encode_memory["traced_peak_bytes"]),
+        "decode_traced_peak_bytes": (decode_memory["traced_peak_bytes"]),
+        "encode_peak_rss_kib": (encode_memory["peak_rss_kib"]),
+        "decode_peak_rss_kib": (decode_memory["peak_rss_kib"]),
     }
 
 
 def environment_record() -> dict[str, object]:
     return {
-        "python_version": (
-            platform.python_version()
-        ),
-        "lasagna_version": (
-            project_version()
-        ),
+        "python_version": (platform.python_version()),
+        "lasagna_version": (project_version()),
         "platform": platform.platform(),
         "system": platform.system(),
         "release": platform.release(),
         "machine": platform.machine(),
-        "logical_cpu_count": (
-            os.cpu_count()
-        ),
+        "logical_cpu_count": (os.cpu_count()),
         "seed": SEED,
     }
 
@@ -704,23 +585,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--matrix",
         type=Path,
-        default=Path(
-            "docs/performance-benchmark-matrix.tsv"
-        ),
+        default=Path("docs/performance-benchmark-matrix.tsv"),
     )
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path(
-            "/tmp/lasagna-v2-issue6-performance.csv"
-        ),
+        default=Path("/tmp/lasagna-v2-issue6-performance.csv"),
     )
     parser.add_argument(
         "--environment-output",
         type=Path,
-        default=Path(
-            "/tmp/lasagna-v2-issue6-environment.json"
-        ),
+        default=Path("/tmp/lasagna-v2-issue6-environment.json"),
     )
     parser.add_argument(
         "--repetitions",
@@ -771,15 +646,8 @@ def main() -> None:
     args = parse_args()
 
     if args.timing_worker:
-        if (
-            args.codec is None
-            or args.signal is None
-            or args.n_samples is None
-        ):
-            raise SystemExit(
-                "Timing worker requires codec, "
-                "signal and n-samples"
-            )
+        if args.codec is None or args.signal is None or args.n_samples is None:
+            raise SystemExit("Timing worker requires codec, " "signal and n-samples")
 
         timing_worker(
             codec=args.codec,
@@ -791,15 +659,8 @@ def main() -> None:
         return
 
     if args.memory_worker is not None:
-        if (
-            args.codec is None
-            or args.signal is None
-            or args.n_samples is None
-        ):
-            raise SystemExit(
-                "Memory worker requires codec, "
-                "signal and n-samples"
-            )
+        if args.codec is None or args.signal is None or args.n_samples is None:
+            raise SystemExit("Memory worker requires codec, " "signal and n-samples")
 
         memory_worker(
             operation=args.memory_worker,
@@ -809,9 +670,7 @@ def main() -> None:
         )
         return
 
-    cases = load_matrix(
-        args.matrix
-    )
+    cases = load_matrix(args.matrix)
 
     environment = environment_record()
 
@@ -863,18 +722,10 @@ def main() -> None:
         rows,
     )
 
-    print(
-        f"RESULT_ROWS={len(rows)}"
-    )
-    print(
-        f"OUTPUT={args.output}"
-    )
-    print(
-        f"ENVIRONMENT_OUTPUT={args.environment_output}"
-    )
-    print(
-        "PERFORMANCE_BENCHMARK_GATE=PASS"
-    )
+    print(f"RESULT_ROWS={len(rows)}")
+    print(f"OUTPUT={args.output}")
+    print(f"ENVIRONMENT_OUTPUT={args.environment_output}")
+    print("PERFORMANCE_BENCHMARK_GATE=PASS")
 
 
 if __name__ == "__main__":

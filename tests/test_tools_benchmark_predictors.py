@@ -13,13 +13,9 @@ SPEC = importlib.util.spec_from_file_location(
 )
 
 if SPEC is None or SPEC.loader is None:
-    raise RuntimeError(
-        "Unable to load benchmark_predictors"
-    )
+    raise RuntimeError("Unable to load benchmark_predictors")
 
-benchmark_predictors = importlib.util.module_from_spec(
-    SPEC
-)
+benchmark_predictors = importlib.util.module_from_spec(SPEC)
 
 sys.modules[SPEC.name] = benchmark_predictors
 SPEC.loader.exec_module(benchmark_predictors)
@@ -29,9 +25,7 @@ def candidate_specs():
     return {
         spec.name: spec
         for spec in benchmark_predictors.load_candidate_matrix(
-            ROOT
-            / "docs"
-            / "predictor-candidate-matrix.tsv"
+            ROOT / "docs" / "predictor-candidate-matrix.tsv"
         )
     }
 
@@ -65,15 +59,7 @@ def test_lag24_reconstructs_periodic_signal_causally() -> None:
     spec = candidate_specs()["lag24"]
 
     values = [
-        10.0
-        + 2.0
-        * math.sin(
-            2.0
-            * math.pi
-            * index
-            / 24.0
-        )
-        for index in range(128)
+        10.0 + 2.0 * math.sin(2.0 * math.pi * index / 24.0) for index in range(128)
     ]
 
     result = benchmark_predictors.evaluate_predictor(
@@ -89,10 +75,7 @@ def test_lag24_reconstructs_periodic_signal_causally() -> None:
 def test_random_walk_decoder_is_reconstruction_causal() -> None:
     spec = candidate_specs()["random_walk"]
 
-    values = [
-        0.1 * index * index
-        for index in range(64)
-    ]
+    values = [0.1 * index * index for index in range(64)]
 
     result = benchmark_predictors.evaluate_predictor(
         spec,
@@ -107,12 +90,7 @@ def test_random_walk_decoder_is_reconstruction_causal() -> None:
 def test_quadratic_fits_exact_quadratic_signal() -> None:
     spec = candidate_specs()["quadratic"]
 
-    values = [
-        1.0
-        + 0.01 * index
-        + 0.0001 * index * index
-        for index in range(64)
-    ]
+    values = [1.0 + 0.01 * index + 0.0001 * index * index for index in range(64)]
 
     result = benchmark_predictors.evaluate_predictor(
         spec,

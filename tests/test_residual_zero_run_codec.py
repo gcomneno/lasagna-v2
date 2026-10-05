@@ -32,10 +32,7 @@ def _coding_type(data: bytes) -> int:
     offset = (
         core.FILE_HEADER_STRUCT.size
         + header_len
-        + (
-            n_segments
-            * core.SEGMENT_ENTRY_V2_STRUCT.size
-        )
+        + (n_segments * core.SEGMENT_ENTRY_V2_STRUCT.size)
     )
 
     (
@@ -63,11 +60,7 @@ def test_zero_run_helper_roundtrip() -> None:
         64,
     ]
 
-    encoded = (
-        core.encode_int_list_zero_run_varint(
-            values
-        )
-    )
+    encoded = core.encode_int_list_zero_run_varint(values)
 
     assert (
         core.decode_int_list_zero_run_varint(
@@ -79,10 +72,7 @@ def test_zero_run_helper_roundtrip() -> None:
 
 
 def test_zero_run_decoder_rejects_short_run() -> None:
-    payload = (
-        core._encode_varint(0)
-        + core._encode_varint(2)
-    )
+    payload = core._encode_varint(0) + core._encode_varint(2)
 
     with pytest.raises(
         ValueError,
@@ -95,12 +85,7 @@ def test_zero_run_decoder_rejects_short_run() -> None:
 
 
 def test_v2_explicit_zero_run_roundtrip() -> None:
-    ts = _timeseries(
-        [
-            0.1 * index
-            for index in range(200)
-        ]
-    )
+    ts = _timeseries([0.1 * index for index in range(200)])
 
     encoded = core.encode_timeseries_v2(
         ts,
@@ -109,24 +94,15 @@ def test_v2_explicit_zero_run_roundtrip() -> None:
         residual_coding="zero-run",
     )
 
-    assert _coding_type(encoded) == (
-        core.RESIDUAL_CODEC_ZERO_RUN_VARINT
-    )
+    assert _coding_type(encoded) == (core.RESIDUAL_CODEC_ZERO_RUN_VARINT)
 
-    decoded = core.decode_timeseries(
-        encoded
-    )
+    decoded = core.decode_timeseries(encoded)
 
     assert len(decoded.values) == len(ts.values)
 
 
 def test_v2_auto_selects_zero_run_when_smaller() -> None:
-    ts = _timeseries(
-        [
-            0.1 * index
-            for index in range(200)
-        ]
-    )
+    ts = _timeseries([0.1 * index for index in range(200)])
 
     encoded_auto = core.encode_timeseries_v2(
         ts,
@@ -142,28 +118,16 @@ def test_v2_auto_selects_zero_run_when_smaller() -> None:
         residual_coding="varint",
     )
 
-    assert _coding_type(encoded_auto) == (
-        core.RESIDUAL_CODEC_ZERO_RUN_VARINT
-    )
+    assert _coding_type(encoded_auto) == (core.RESIDUAL_CODEC_ZERO_RUN_VARINT)
 
-    assert len(encoded_auto) < len(
-        encoded_varint
-    )
+    assert len(encoded_auto) < len(encoded_varint)
 
 
 def test_v2_auto_never_exceeds_varint_size() -> None:
     cases = [
         [0.1 * index for index in range(200)],
-        [
-            float(index % 11)
-            for index in range(300)
-        ],
-        [
-            10.0
-            if index % 37
-            else 100.0
-            for index in range(300)
-        ],
+        [float(index % 11) for index in range(300)],
+        [10.0 if index % 37 else 100.0 for index in range(300)],
     ]
 
     for values in cases:
@@ -187,12 +151,7 @@ def test_v2_auto_never_exceeds_varint_size() -> None:
 
 
 def test_v1_encoder_contract_remains_raw_or_varint() -> None:
-    ts = _timeseries(
-        [
-            float(index)
-            for index in range(64)
-        ]
-    )
+    ts = _timeseries([float(index) for index in range(64)])
 
     for residual_coding in (
         "zero-run",
@@ -211,15 +170,9 @@ def test_v1_encoder_contract_remains_raw_or_varint() -> None:
 def test_zero_run_worst_case_is_decodable() -> None:
     values = [-64] * 128
 
-    varint = core.encode_int_list_varint(
-        values
-    )
+    varint = core.encode_int_list_varint(values)
 
-    zero_run = (
-        core.encode_int_list_zero_run_varint(
-            values
-        )
-    )
+    zero_run = core.encode_int_list_zero_run_varint(values)
 
     assert len(zero_run) == 2 * len(varint)
 

@@ -477,4 +477,3 @@ wire representation is explicitly designed
 ```
 
 A gain confined to synthetic or unusually large blocks is insufficient.
-

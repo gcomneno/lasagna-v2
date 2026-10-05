@@ -11,7 +11,6 @@ import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
 
 ROOT = Path(__file__).resolve().parents[1]
 TOOLS = ROOT / "tools"
@@ -25,9 +24,9 @@ for import_path in (
     if value not in sys.path:
         sys.path.insert(0, value)
 
-from lasagna2 import core
+from lasagna2 import core  # noqa: E402
 
-from benchmark_codec import (
+from benchmark_codec import (  # noqa: E402
     error_metrics,
     load_csv_values,
 )
@@ -122,28 +121,18 @@ def load_candidate_matrix(
         CandidateSpec(
             name=row["predictor"],
             candidate_class=row["candidate_class"],
-            parameter_payload_bytes=int(
-                row["parameter_payload_bytes"]
-            ),
+            parameter_payload_bytes=int(row["parameter_payload_bytes"]),
             recurrence=row["recurrence"],
-            seed_history_values=int(
-                row["seed_history_values"]
-            ),
+            seed_history_values=int(row["seed_history_values"]),
         )
         for row in rows
     ]
 
     if not specs:
-        raise ValueError(
-            "Predictor candidate matrix is empty"
-        )
+        raise ValueError("Predictor candidate matrix is empty")
 
-    if len(specs) != len(
-        {spec.name for spec in specs}
-    ):
-        raise ValueError(
-            "Duplicate predictor candidate"
-        )
+    if len(specs) != len({spec.name for spec in specs}):
+        raise ValueError("Duplicate predictor candidate")
 
     return specs
 
@@ -165,9 +154,7 @@ def solve_3x3(
     for col in range(n):
         pivot = max(
             range(col, n),
-            key=lambda row: abs(
-                a[row][col]
-            ),
+            key=lambda row: abs(a[row][col]),
         )
 
         if abs(a[pivot][col]) < 1e-12:
@@ -191,9 +178,7 @@ def solve_3x3(
             factor = a[row][col]
 
             for j in range(col, n + 1):
-                a[row][j] -= (
-                    factor * a[col][j]
-                )
+                a[row][j] -= factor * a[col][j]
 
     return (
         a[0][3],
@@ -211,9 +196,7 @@ def fit_quadratic(
     n = len(values)
 
     if n < 3:
-        mean, slope, intercept, _ = (
-            core.compute_stats(values)
-        )
+        mean, slope, intercept, _ = core.compute_stats(values)
         return (
             (
                 intercept,
@@ -224,28 +207,13 @@ def fit_quadratic(
         )
 
     sx = sum(range(n))
-    sx2 = sum(
-        i * i
-        for i in range(n)
-    )
-    sx3 = sum(
-        i * i * i
-        for i in range(n)
-    )
-    sx4 = sum(
-        i * i * i * i
-        for i in range(n)
-    )
+    sx2 = sum(i * i for i in range(n))
+    sx3 = sum(i * i * i for i in range(n))
+    sx4 = sum(i * i * i * i for i in range(n))
 
     sy = sum(values)
-    sxy = sum(
-        i * value
-        for i, value in enumerate(values)
-    )
-    sx2y = sum(
-        i * i * value
-        for i, value in enumerate(values)
-    )
+    sxy = sum(i * value for i, value in enumerate(values))
+    sx2y = sum(i * i * value for i, value in enumerate(values))
 
     solution = solve_3x3(
         [
@@ -263,9 +231,7 @@ def fit_quadratic(
     if solution is not None:
         return solution, False
 
-    _mean, slope, intercept, _ = (
-        core.compute_stats(values)
-    )
+    _mean, slope, intercept, _ = core.compute_stats(values)
 
     return (
         (
@@ -297,10 +263,7 @@ def fit_ar1(
     mean_x = sum(previous) / len(previous)
     mean_y = sum(current) / len(current)
 
-    variance_x = sum(
-        (value - mean_x) ** 2
-        for value in previous
-    )
+    variance_x = sum((value - mean_x) ** 2 for value in previous)
 
     if variance_x <= 1e-18:
         return (
@@ -319,10 +282,7 @@ def fit_ar1(
     phi = covariance / variance_x
     intercept = mean_y - phi * mean_x
 
-    if not (
-        math.isfinite(phi)
-        and math.isfinite(intercept)
-    ):
+    if not (math.isfinite(phi) and math.isfinite(intercept)):
         return (
             (0.0, 1.0, seed),
             True,
@@ -351,11 +311,7 @@ def quantize(
 def payload_size(
     quantized: list[int],
 ) -> int:
-    return len(
-        core.encode_int_list_varint(
-            quantized
-        )
-    )
+    return len(core.encode_int_list_varint(quantized))
 
 
 def evaluate_nonrecurrent(
@@ -374,13 +330,9 @@ def evaluate_nonrecurrent(
         )
     ]
 
-    quantized, q = quantize(
-        residuals
-    )
+    quantized, q = quantize(residuals)
 
-    payload_bytes = payload_size(
-        quantized
-    )
+    payload_bytes = payload_size(quantized)
 
     start_decode = time.perf_counter_ns()
 
@@ -392,10 +344,7 @@ def evaluate_nonrecurrent(
         )
     ]
 
-    decode_ms = (
-        time.perf_counter_ns()
-        - start_decode
-    ) / 1_000_000.0
+    decode_ms = (time.perf_counter_ns() - start_decode) / 1_000_000.0
 
     rmse, max_abs_error = error_metrics(
         values,
@@ -434,10 +383,7 @@ def evaluate_predictor(
 
     if spec.name == "mean":
         mean = sum(values) / len(values)
-        predictions = [
-            mean
-            for _ in values
-        ]
+        predictions = [mean for _ in values]
 
     elif spec.name == "linear":
         (
@@ -447,10 +393,7 @@ def evaluate_predictor(
             _variance,
         ) = core.compute_stats(values)
 
-        predictions = [
-            intercept + slope * index
-            for index in range(len(values))
-        ]
+        predictions = [intercept + slope * index for index in range(len(values))]
 
     elif spec.name == "random_walk":
         seed = values[0]
@@ -459,43 +402,24 @@ def evaluate_predictor(
         residuals[0] = values[0] - seed
 
         for index in range(1, len(values)):
-            residuals[index] = (
-                values[index]
-                - values[index - 1]
-            )
+            residuals[index] = values[index] - values[index - 1]
 
-        quantized, q = quantize(
-            residuals
-        )
+        quantized, q = quantize(residuals)
 
-        payload_bytes = payload_size(
-            quantized
-        )
+        payload_bytes = payload_size(quantized)
 
-        fit_ms = (
-            time.perf_counter_ns()
-            - start_fit
-        ) / 1_000_000.0
+        fit_ms = (time.perf_counter_ns() - start_fit) / 1_000_000.0
 
         start_decode = time.perf_counter_ns()
 
         reconstructed = [0.0] * len(values)
 
-        reconstructed[0] = (
-            seed
-            + quantized[0] * q
-        )
+        reconstructed[0] = seed + quantized[0] * q
 
         for index in range(1, len(values)):
-            reconstructed[index] = (
-                reconstructed[index - 1]
-                + quantized[index] * q
-            )
+            reconstructed[index] = reconstructed[index - 1] + quantized[index] * q
 
-        decode_ms = (
-            time.perf_counter_ns()
-            - start_decode
-        ) / 1_000_000.0
+        decode_ms = (time.perf_counter_ns() - start_decode) / 1_000_000.0
 
         rmse, max_abs_error = error_metrics(
             values,
@@ -513,9 +437,7 @@ def evaluate_predictor(
             predictor=spec.name,
             eligible=True,
             fallback=False,
-            parameter_payload_bytes=(
-                spec.parameter_payload_bytes
-            ),
+            parameter_payload_bytes=(spec.parameter_payload_bytes),
             residual_payload_bytes=payload_bytes,
             projected_total_bytes=projected,
             reconstructed=reconstructed,
@@ -527,10 +449,7 @@ def evaluate_predictor(
 
     elif spec.name == "median":
         median = statistics.median(values)
-        predictions = [
-            median
-            for _ in values
-        ]
+        predictions = [median for _ in values]
 
     elif spec.name == "quadratic":
         (
@@ -541,8 +460,7 @@ def evaluate_predictor(
         a, b, c = coefficients
 
         predictions = [
-            a + b * index + c * index * index
-            for index in range(len(values))
+            a + b * index + c * index * index for index in range(len(values))
         ]
 
     elif spec.name == "ar1":
@@ -562,48 +480,24 @@ def evaluate_predictor(
         # formed against original history; decoder simulation below is
         # strictly reconstruction-causal.
         for index in range(1, len(values)):
-            prediction = (
-                intercept
-                + phi * values[index - 1]
-            )
-            residuals[index] = (
-                values[index] - prediction
-            )
+            prediction = intercept + phi * values[index - 1]
+            residuals[index] = values[index] - prediction
 
-        quantized, q = quantize(
-            residuals
-        )
+        quantized, q = quantize(residuals)
 
-        payload_bytes = payload_size(
-            quantized
-        )
+        payload_bytes = payload_size(quantized)
 
-        fit_ms = (
-            time.perf_counter_ns()
-            - start_fit
-        ) / 1_000_000.0
+        fit_ms = (time.perf_counter_ns() - start_fit) / 1_000_000.0
 
         start_decode = time.perf_counter_ns()
 
-        reconstructed[0] = (
-            seed + quantized[0] * q
-        )
+        reconstructed[0] = seed + quantized[0] * q
 
         for index in range(1, len(values)):
-            prediction = (
-                intercept
-                + phi
-                * reconstructed[index - 1]
-            )
-            reconstructed[index] = (
-                prediction
-                + quantized[index] * q
-            )
+            prediction = intercept + phi * reconstructed[index - 1]
+            reconstructed[index] = prediction + quantized[index] * q
 
-        decode_ms = (
-            time.perf_counter_ns()
-            - start_decode
-        ) / 1_000_000.0
+        decode_ms = (time.perf_counter_ns() - start_decode) / 1_000_000.0
 
         rmse, max_abs_error = error_metrics(
             values,
@@ -621,9 +515,7 @@ def evaluate_predictor(
             predictor=spec.name,
             eligible=True,
             fallback=fallback,
-            parameter_payload_bytes=(
-                spec.parameter_payload_bytes
-            ),
+            parameter_payload_bytes=(spec.parameter_payload_bytes),
             residual_payload_bytes=payload_bytes,
             projected_total_bytes=projected,
             reconstructed=reconstructed,
@@ -639,44 +531,31 @@ def evaluate_predictor(
                 predictor=spec.name,
                 eligible=False,
                 fallback=False,
-                parameter_payload_bytes=(
-                    spec.parameter_payload_bytes
-                ),
+                parameter_payload_bytes=(spec.parameter_payload_bytes),
                 residual_payload_bytes=0,
                 projected_total_bytes=0,
                 reconstructed=[],
                 rmse=math.inf,
                 max_abs_error=math.inf,
-                fit_time_ms=(
-                    time.perf_counter_ns()
-                    - start_fit
-                ) / 1_000_000.0,
+                fit_time_ms=(time.perf_counter_ns() - start_fit) / 1_000_000.0,
                 decode_time_ms=0.0,
             )
 
         history = values[:24]
 
         residuals = [
-            values[index]
-            - values[index - 24]
+            values[index] - values[index - 24]
             for index in range(
                 24,
                 len(values),
             )
         ]
 
-        quantized, q = quantize(
-            residuals
-        )
+        quantized, q = quantize(residuals)
 
-        payload_bytes = payload_size(
-            quantized
-        )
+        payload_bytes = payload_size(quantized)
 
-        fit_ms = (
-            time.perf_counter_ns()
-            - start_fit
-        ) / 1_000_000.0
+        fit_ms = (time.perf_counter_ns() - start_fit) / 1_000_000.0
 
         start_decode = time.perf_counter_ns()
 
@@ -689,14 +568,10 @@ def evaluate_predictor(
             )
         ):
             reconstructed.append(
-                reconstructed[index - 24]
-                + quantized[residual_index] * q
+                reconstructed[index - 24] + quantized[residual_index] * q
             )
 
-        decode_ms = (
-            time.perf_counter_ns()
-            - start_decode
-        ) / 1_000_000.0
+        decode_ms = (time.perf_counter_ns() - start_decode) / 1_000_000.0
 
         rmse, max_abs_error = error_metrics(
             values,
@@ -714,9 +589,7 @@ def evaluate_predictor(
             predictor=spec.name,
             eligible=True,
             fallback=False,
-            parameter_payload_bytes=(
-                spec.parameter_payload_bytes
-            ),
+            parameter_payload_bytes=(spec.parameter_payload_bytes),
             residual_payload_bytes=payload_bytes,
             projected_total_bytes=projected,
             reconstructed=reconstructed,
@@ -727,22 +600,15 @@ def evaluate_predictor(
         )
 
     else:
-        raise ValueError(
-            f"Unknown predictor: {spec.name}"
-        )
+        raise ValueError(f"Unknown predictor: {spec.name}")
 
-    fit_ms = (
-        time.perf_counter_ns()
-        - start_fit
-    ) / 1_000_000.0
+    fit_ms = (time.perf_counter_ns() - start_fit) / 1_000_000.0
 
     result = evaluate_nonrecurrent(
         values,
         predictions,
         predictor=spec.name,
-        parameter_payload_bytes=(
-            spec.parameter_payload_bytes
-        ),
+        parameter_payload_bytes=(spec.parameter_payload_bytes),
         fallback=fallback,
     )
 
@@ -773,9 +639,7 @@ def evaluate_dataset(
 ]:
     values = load_csv_values(path)
 
-    segments = dataset_segments(
-        values
-    )
+    segments = dataset_segments(values)
 
     aggregate: dict[
         str,
@@ -794,17 +658,13 @@ def evaluate_dataset(
         for spec in specs
     }
 
-    winners: list[
-        dict[str, object]
-    ] = []
+    winners: list[dict[str, object]] = []
 
     for segment_index, (
         start,
         end,
     ) in enumerate(segments):
-        segment_values = values[
-            start : end + 1
-        ]
+        segment_values = values[start : end + 1]
 
         evaluated = {
             spec.name: evaluate_predictor(
@@ -814,16 +674,10 @@ def evaluate_dataset(
             for spec in specs
         }
 
-        eligible = [
-            result
-            for result in evaluated.values()
-            if result.eligible
-        ]
+        eligible = [result for result in evaluated.values() if result.eligible]
 
         if not eligible:
-            raise ValueError(
-                "Segment has no eligible predictor"
-            )
+            raise ValueError("Segment has no eligible predictor")
 
         mse_winner = min(
             eligible,
@@ -850,106 +704,59 @@ def evaluate_dataset(
                 "segment_index": segment_index,
                 "start_idx": start,
                 "end_idx": end,
-                "segment_length": (
-                    end - start + 1
-                ),
-                "mse_winner": (
-                    mse_winner.predictor
-                ),
-                "mse_winner_rmse": (
-                    mse_winner.rmse
-                ),
-                "byte_winner": (
-                    byte_winner.predictor
-                ),
-                "byte_winner_projected_bytes": (
-                    byte_winner.projected_total_bytes
-                ),
+                "segment_length": (end - start + 1),
+                "mse_winner": (mse_winner.predictor),
+                "mse_winner_rmse": (mse_winner.rmse),
+                "byte_winner": (byte_winner.predictor),
+                "byte_winner_projected_bytes": (byte_winner.projected_total_bytes),
             }
         )
 
         for spec in specs:
-            result = evaluated[
-                spec.name
-            ]
+            result = evaluated[spec.name]
 
-            bucket = aggregate[
-                spec.name
-            ]
+            bucket = aggregate[spec.name]
 
             if not result.eligible:
                 continue
 
-            bucket["eligible"] = (
-                int(bucket["eligible"]) + 1
-            )
-            bucket["fallback"] = (
-                int(bucket["fallback"])
-                + int(result.fallback)
-            )
+            bucket["eligible"] = int(bucket["eligible"]) + 1
+            bucket["fallback"] = int(bucket["fallback"]) + int(result.fallback)
             bucket["metadata"] = (
                 int(bucket["metadata"])
                 + COMMON_METADATA_BYTES
                 + spec.parameter_payload_bytes
                 + RESIDUAL_BLOCK_HEADER_BYTES
             )
-            bucket["payload"] = (
-                int(bucket["payload"])
-                + result.residual_payload_bytes
-            )
-            bucket["total"] = (
-                int(bucket["total"])
-                + result.projected_total_bytes
-            )
-            bucket["fit_ms"] = (
-                float(bucket["fit_ms"])
-                + result.fit_time_ms
-            )
-            bucket["decode_ms"] = (
-                float(bucket["decode_ms"])
-                + result.decode_time_ms
-            )
+            bucket["payload"] = int(bucket["payload"]) + result.residual_payload_bytes
+            bucket["total"] = int(bucket["total"]) + result.projected_total_bytes
+            bucket["fit_ms"] = float(bucket["fit_ms"]) + result.fit_time_ms
+            bucket["decode_ms"] = float(bucket["decode_ms"]) + result.decode_time_ms
 
-            reconstructed = bucket[
-                "reconstructed"
-            ]
+            reconstructed = bucket["reconstructed"]
 
             if not isinstance(
                 reconstructed,
                 list,
             ):
-                raise TypeError(
-                    "Invalid reconstructed accumulator"
-                )
+                raise TypeError("Invalid reconstructed accumulator")
 
-            reconstructed.extend(
-                result.reconstructed
-            )
+            reconstructed.extend(result.reconstructed)
 
-    rows: list[
-        dict[str, object]
-    ] = []
+    rows: list[dict[str, object]] = []
 
     for spec in specs:
-        bucket = aggregate[
-            spec.name
-        ]
+        bucket = aggregate[spec.name]
 
-        reconstructed = bucket[
-            "reconstructed"
-        ]
+        reconstructed = bucket["reconstructed"]
 
         if not isinstance(
             reconstructed,
             list,
         ):
-            raise TypeError(
-                "Invalid reconstructed values"
-            )
+            raise TypeError("Invalid reconstructed values")
 
-        eligible_segments = int(
-            bucket["eligible"]
-        )
+        eligible_segments = int(bucket["eligible"])
 
         if eligible_segments == len(segments):
             (
@@ -963,58 +770,28 @@ def evaluate_dataset(
             rmse = math.nan
             max_abs_error = math.nan
 
-        total_bytes = int(
-            bucket["total"]
-        )
+        total_bytes = int(bucket["total"])
 
         rows.append(
             {
                 "dataset": path.name,
-                "evidence_group": (
-                    evidence_group
-                ),
+                "evidence_group": (evidence_group),
                 "predictor": spec.name,
-                "candidate_class": (
-                    spec.candidate_class
-                ),
+                "candidate_class": (spec.candidate_class),
                 "n_samples": len(values),
-                "segment_count": (
-                    len(segments)
-                ),
-                "eligible_segment_count": (
-                    eligible_segments
-                ),
-                "fallback_segment_count": (
-                    int(bucket["fallback"])
-                ),
-                "projected_metadata_bytes": (
-                    int(bucket["metadata"])
-                ),
-                "residual_payload_bytes": (
-                    int(bucket["payload"])
-                ),
-                "projected_total_bytes": (
-                    total_bytes
-                ),
+                "segment_count": (len(segments)),
+                "eligible_segment_count": (eligible_segments),
+                "fallback_segment_count": (int(bucket["fallback"])),
+                "projected_metadata_bytes": (int(bucket["metadata"])),
+                "residual_payload_bytes": (int(bucket["payload"])),
+                "projected_total_bytes": (total_bytes),
                 "bits_per_sample": (
-                    total_bytes
-                    * 8
-                    / len(values)
-                    if total_bytes
-                    else math.nan
+                    total_bytes * 8 / len(values) if total_bytes else math.nan
                 ),
                 "rmse": rmse,
-                "max_abs_error": (
-                    max_abs_error
-                ),
-                "fit_time_ms": float(
-                    bucket["fit_ms"]
-                ),
-                "decode_simulation_time_ms": (
-                    float(
-                        bucket["decode_ms"]
-                    )
-                ),
+                "max_abs_error": (max_abs_error),
+                "fit_time_ms": float(bucket["fit_ms"]),
+                "decode_simulation_time_ms": (float(bucket["decode_ms"])),
             }
         )
 
@@ -1050,23 +827,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--matrix",
         type=Path,
-        default=Path(
-            "docs/predictor-candidate-matrix.tsv"
-        ),
+        default=Path("docs/predictor-candidate-matrix.tsv"),
     )
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path(
-            "/tmp/lasagna-v2-issue7-predictors.csv"
-        ),
+        default=Path("/tmp/lasagna-v2-issue7-predictors.csv"),
     )
     parser.add_argument(
         "--winner-output",
         type=Path,
-        default=Path(
-            "/tmp/lasagna-v2-issue7-predictor-winners.csv"
-        ),
+        default=Path("/tmp/lasagna-v2-issue7-predictor-winners.csv"),
     )
 
     return parser.parse_args()
@@ -1075,16 +846,10 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
 
-    specs = load_candidate_matrix(
-        args.matrix
-    )
+    specs = load_candidate_matrix(args.matrix)
 
-    all_rows: list[
-        dict[str, object]
-    ] = []
-    all_winners: list[
-        dict[str, object]
-    ] = []
+    all_rows: list[dict[str, object]] = []
+    all_winners: list[dict[str, object]] = []
 
     for evidence_group, path in DATASETS:
         rows, winners = evaluate_dataset(
@@ -1105,29 +870,14 @@ def main() -> None:
         eligible_rows = [
             row
             for row in rows
-            if (
-                int(
-                    row[
-                        "eligible_segment_count"
-                    ]
-                )
-                == int(
-                    row["segment_count"]
-                )
-            )
+            if (int(row["eligible_segment_count"]) == int(row["segment_count"]))
         ]
 
         best = min(
             eligible_rows,
             key=lambda row: (
-                int(
-                    row[
-                        "projected_total_bytes"
-                    ]
-                ),
-                float(
-                    row["rmse"]
-                ),
+                int(row["projected_total_bytes"]),
+                float(row["rmse"]),
             ),
         )
 
@@ -1150,21 +900,11 @@ def main() -> None:
         all_winners,
     )
 
-    print(
-        f"RESULT_ROWS={len(all_rows)}"
-    )
-    print(
-        f"WINNER_ROWS={len(all_winners)}"
-    )
-    print(
-        f"OUTPUT={args.output}"
-    )
-    print(
-        f"WINNER_OUTPUT={args.winner_output}"
-    )
-    print(
-        "PREDICTOR_TOURNAMENT_GATE=PASS"
-    )
+    print(f"RESULT_ROWS={len(all_rows)}")
+    print(f"WINNER_ROWS={len(all_winners)}")
+    print(f"OUTPUT={args.output}")
+    print(f"WINNER_OUTPUT={args.winner_output}")
+    print("PREDICTOR_TOURNAMENT_GATE=PASS")
 
 
 if __name__ == "__main__":

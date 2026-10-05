@@ -20,8 +20,8 @@ for import_path in (ROOT, TOOLS):
     if value not in sys.path:
         sys.path.insert(0, value)
 
-from lasagna2 import core
-from benchmark_codec import load_csv_values
+from lasagna2 import core  # noqa: E402
+from benchmark_codec import load_csv_values  # noqa: E402
 
 
 C_Q = 0.125
@@ -125,11 +125,7 @@ def symbol_entropy(values: list[int]) -> float:
     counts = Counter(values)
     total = len(values)
 
-    return -sum(
-        (count / total)
-        * math.log2(count / total)
-        for count in counts.values()
-    )
+    return -sum((count / total) * math.log2(count / total) for count in counts.values())
 
 
 def varint_width(value: int) -> int:
@@ -159,9 +155,7 @@ def load_matrix(path: Path) -> list[MatrixRow]:
     ]
 
     if len(matrix) != len(set(matrix)):
-        raise ValueError(
-            "Duplicate residual-distribution matrix row"
-        )
+        raise ValueError("Duplicate residual-distribution matrix row")
 
     return matrix
 
@@ -196,17 +190,12 @@ def build_v2_residual_stream(
         mse_threshold=0.5,
     )
 
-    v2_segments = [
-        core._round_segment_entry_v2(segment)
-        for segment in model_segments
-    ]
+    v2_segments = [core._round_segment_entry_v2(segment) for segment in model_segments]
 
     residual_segments: list[list[int]] = []
 
     for segment in v2_segments:
-        x_seg = values[
-            segment.start_idx : segment.end_idx + 1
-        ]
+        x_seg = values[segment.start_idx : segment.end_idx + 1]
 
         predictions = core._build_preds_for_segmentation(
             x_seg,
@@ -220,9 +209,7 @@ def build_v2_residual_stream(
         q = segment.quant_step_Q
 
         q_res = [
-            round(
-                (value - prediction) / q
-            )
+            round((value - prediction) / q)
             for value, prediction in zip(
                 x_seg,
                 predictions,
@@ -238,41 +225,21 @@ def summarize_values(
     values: list[int],
 ) -> dict[str, float | int]:
     if not values:
-        raise ValueError(
-            "Residual stream must not be empty"
-        )
+        raise ValueError("Residual stream must not be empty")
 
-    abs_values = [
-        abs(value)
-        for value in values
-    ]
+    abs_values = [abs(value) for value in values]
 
-    zigzag_values = [
-        core.zigzag_encode(int(value))
-        for value in values
-    ]
+    zigzag_values = [core.zigzag_encode(int(value)) for value in values]
 
-    widths = [
-        varint_width(value)
-        for value in values
-    ]
+    widths = [varint_width(value) for value in values]
 
     runs = zero_runs(values)
 
-    zero_count = sum(
-        value == 0
-        for value in values
-    )
+    zero_count = sum(value == 0 for value in values)
 
-    positive_count = sum(
-        value > 0
-        for value in values
-    )
+    positive_count = sum(value > 0 for value in values)
 
-    negative_count = sum(
-        value < 0
-        for value in values
-    )
+    negative_count = sum(value < 0 for value in values)
 
     return {
         "residual_count": len(values),
@@ -298,33 +265,14 @@ def summarize_values(
         "varint_1byte_count": widths.count(1),
         "varint_2byte_count": widths.count(2),
         "varint_3byte_count": widths.count(3),
-        "varint_4plus_count": sum(
-            width >= 4
-            for width in widths
-        ),
-        "varint_1byte_fraction": (
-            widths.count(1) / len(widths)
-        ),
-        "raw_int32_payload_bytes": (
-            4 * len(values)
-        ),
+        "varint_4plus_count": sum(width >= 4 for width in widths),
+        "varint_1byte_fraction": (widths.count(1) / len(widths)),
+        "raw_int32_payload_bytes": (4 * len(values)),
         "varint_payload_bytes": sum(widths),
-        "longest_zero_run": (
-            max(runs)
-            if runs
-            else 0
-        ),
+        "longest_zero_run": (max(runs) if runs else 0),
         "zero_run_count": len(runs),
-        "mean_zero_run_length": (
-            statistics.fmean(runs)
-            if runs
-            else 0.0
-        ),
-        "median_zero_run_length": (
-            statistics.median(runs)
-            if runs
-            else 0.0
-        ),
+        "mean_zero_run_length": (statistics.fmean(runs) if runs else 0.0),
+        "median_zero_run_length": (statistics.median(runs) if runs else 0.0),
         "p95_zero_run_length": (
             percentile_nearest_rank(
                 runs,
@@ -333,9 +281,7 @@ def summarize_values(
             if runs
             else 0.0
         ),
-        "symbol_entropy_bits_per_residual": (
-            symbol_entropy(values)
-        ),
+        "symbol_entropy_bits_per_residual": (symbol_entropy(values)),
     }
 
 
@@ -345,27 +291,17 @@ def analyze_case(
     dict[str, object],
     list[dict[str, object]],
 ]:
-    values = load_csv_values(
-        row.dataset
+    values = load_csv_values(row.dataset)
+
+    segments, residual_segments = build_v2_residual_stream(
+        values,
+        row.predictor,
     )
 
-    segments, residual_segments = (
-        build_v2_residual_stream(
-            values,
-            row.predictor,
-        )
-    )
-
-    flat = [
-        value
-        for segment in residual_segments
-        for value in segment
-    ]
+    flat = [value for segment in residual_segments for value in segment]
 
     if len(flat) != len(values):
-        raise ValueError(
-            "Residual count does not match sample count"
-        )
+        raise ValueError("Residual count does not match sample count")
 
     stream_stats = summarize_values(flat)
 
@@ -378,9 +314,7 @@ def analyze_case(
         **stream_stats,
     }
 
-    block_rows: list[
-        dict[str, object]
-    ] = []
+    block_rows: list[dict[str, object]] = []
 
     for index, (
         segment,
@@ -391,59 +325,26 @@ def analyze_case(
             residual_segments,
         )
     ):
-        block_stats = summarize_values(
-            q_res
-        )
+        block_stats = summarize_values(q_res)
 
         block_rows.append(
             {
-                "evidence_group": (
-                    row.evidence_group
-                ),
-                "dataset": (
-                    row.dataset.name
-                ),
+                "evidence_group": (row.evidence_group),
+                "dataset": (row.dataset.name),
                 "predictor": row.predictor,
                 "segment_index": index,
                 "segment_length": len(q_res),
-                "predictor_type": (
-                    segment.predictor_type
-                ),
-                "zero_count": (
-                    block_stats[
-                        "zero_count"
-                    ]
-                ),
-                "zero_fraction": (
-                    block_stats[
-                        "zero_fraction"
-                    ]
-                ),
-                "max_abs_q": (
-                    block_stats[
-                        "max_abs_q"
-                    ]
-                ),
-                "varint_payload_bytes": (
-                    block_stats[
-                        "varint_payload_bytes"
-                    ]
-                ),
+                "predictor_type": (segment.predictor_type),
+                "zero_count": (block_stats["zero_count"]),
+                "zero_fraction": (block_stats["zero_fraction"]),
+                "max_abs_q": (block_stats["max_abs_q"]),
+                "varint_payload_bytes": (block_stats["varint_payload_bytes"]),
                 "varint_bytes_per_residual": (
-                    block_stats[
-                        "varint_payload_bytes"
-                    ]
-                    / len(q_res)
+                    block_stats["varint_payload_bytes"] / len(q_res)
                 ),
-                "longest_zero_run": (
-                    block_stats[
-                        "longest_zero_run"
-                    ]
-                ),
+                "longest_zero_run": (block_stats["longest_zero_run"]),
                 "symbol_entropy_bits_per_residual": (
-                    block_stats[
-                        "symbol_entropy_bits_per_residual"
-                    ]
+                    block_stats["symbol_entropy_bits_per_residual"]
                 ),
             }
         )
@@ -480,25 +381,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--matrix",
         type=Path,
-        default=Path(
-            "docs/residual-distribution-matrix.tsv"
-        ),
+        default=Path("docs/residual-distribution-matrix.tsv"),
     )
 
     parser.add_argument(
         "--stream-output",
         type=Path,
-        default=Path(
-            "/tmp/lasagna-v2-issue8-residual-streams.csv"
-        ),
+        default=Path("/tmp/lasagna-v2-issue8-residual-streams.csv"),
     )
 
     parser.add_argument(
         "--block-output",
         type=Path,
-        default=Path(
-            "/tmp/lasagna-v2-issue8-residual-blocks.csv"
-        ),
+        default=Path("/tmp/lasagna-v2-issue8-residual-blocks.csv"),
     )
 
     return parser.parse_args()
@@ -507,32 +402,20 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
 
-    matrix = load_matrix(
-        args.matrix
-    )
+    matrix = load_matrix(args.matrix)
 
-    stream_rows: list[
-        dict[str, object]
-    ] = []
+    stream_rows: list[dict[str, object]] = []
 
-    block_rows: list[
-        dict[str, object]
-    ] = []
+    block_rows: list[dict[str, object]] = []
 
     for index, row in enumerate(
         matrix,
         start=1,
     ):
-        stream_row, case_blocks = (
-            analyze_case(row)
-        )
+        stream_row, case_blocks = analyze_case(row)
 
-        stream_rows.append(
-            stream_row
-        )
-        block_rows.extend(
-            case_blocks
-        )
+        stream_rows.append(stream_row)
+        block_rows.extend(case_blocks)
 
         print(
             f"CASE={index}/{len(matrix)} "
@@ -562,21 +445,11 @@ def main() -> None:
         block_rows,
     )
 
-    print(
-        f"STREAM_ROWS={len(stream_rows)}"
-    )
-    print(
-        f"BLOCK_ROWS={len(block_rows)}"
-    )
-    print(
-        f"STREAM_OUTPUT={args.stream_output}"
-    )
-    print(
-        f"BLOCK_OUTPUT={args.block_output}"
-    )
-    print(
-        "RESIDUAL_DISTRIBUTION_GATE=PASS"
-    )
+    print(f"STREAM_ROWS={len(stream_rows)}")
+    print(f"BLOCK_ROWS={len(block_rows)}")
+    print(f"STREAM_OUTPUT={args.stream_output}")
+    print(f"BLOCK_OUTPUT={args.block_output}")
+    print("RESIDUAL_DISTRIBUTION_GATE=PASS")
 
 
 if __name__ == "__main__":

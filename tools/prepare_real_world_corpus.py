@@ -54,9 +54,7 @@ def load_manifest(path: Path) -> list[DatasetSpec]:
                 outer_sha256=row["outer_sha256"],
                 source_member=row["source_member"],
                 nested_sha256=(
-                    None
-                    if row["nested_sha256"] == "-"
-                    else row["nested_sha256"]
+                    None if row["nested_sha256"] == "-" else row["nested_sha256"]
                 ),
                 value_column=row["value_column"],
                 source_rows=int(row["source_rows"]),
@@ -85,8 +83,7 @@ def require_sha256(
 
     if actual != expected:
         raise ValueError(
-            f"{label} SHA256 mismatch: "
-            f"expected={expected} actual={actual}"
+            f"{label} SHA256 mismatch: " f"expected={expected} actual={actual}"
         )
 
 
@@ -111,27 +108,17 @@ def extract_rows(
     spec: DatasetSpec,
     outer_bytes: bytes,
 ) -> list[dict[str, str]]:
-    with zipfile.ZipFile(
-        io.BytesIO(outer_bytes)
-    ) as outer:
+    with zipfile.ZipFile(io.BytesIO(outer_bytes)) as outer:
         if spec.nested_sha256 is None:
-            member_bytes = outer.read(
-                spec.source_member
-            )
+            member_bytes = outer.read(spec.source_member)
 
             if spec.source_member.endswith(".gz"):
-                with gzip.GzipFile(
-                    fileobj=io.BytesIO(member_bytes)
-                ) as raw:
+                with gzip.GzipFile(fileobj=io.BytesIO(member_bytes)) as raw:
                     return read_csv_rows(raw)
 
-            return read_csv_rows(
-                io.BytesIO(member_bytes)
-            )
+            return read_csv_rows(io.BytesIO(member_bytes))
 
-        nested_name = (
-            "PRSA2017_Data_20130301-20170228.zip"
-        )
+        nested_name = "PRSA2017_Data_20130301-20170228.zip"
         nested_bytes = outer.read(nested_name)
 
         require_sha256(
@@ -140,16 +127,10 @@ def extract_rows(
             f"{spec.dataset_id} nested archive",
         )
 
-        with zipfile.ZipFile(
-            io.BytesIO(nested_bytes)
-        ) as nested:
-            member_bytes = nested.read(
-                spec.source_member
-            )
+        with zipfile.ZipFile(io.BytesIO(nested_bytes)) as nested:
+            member_bytes = nested.read(spec.source_member)
 
-        return read_csv_rows(
-            io.BytesIO(member_bytes)
-        )
+        return read_csv_rows(io.BytesIO(member_bytes))
 
 
 def canonical_values(
@@ -170,28 +151,20 @@ def canonical_values(
     for row in rows:
         if spec.value_column not in row:
             raise ValueError(
-                f"{spec.dataset_id} missing column "
-                f"{spec.value_column!r}"
+                f"{spec.dataset_id} missing column " f"{spec.value_column!r}"
             )
 
         raw = row[spec.value_column].strip()
 
-        is_missing = (
-            not raw
-            or raw.upper() == "NA"
-        )
+        is_missing = not raw or raw.upper() == "NA"
 
         if is_missing:
             missing += 1
 
-            if spec.missing_policy.startswith(
-                "drop rows"
-            ):
+            if spec.missing_policy.startswith("drop rows"):
                 continue
 
-            raise ValueError(
-                f"{spec.dataset_id} unexpected missing value"
-            )
+            raise ValueError(f"{spec.dataset_id} unexpected missing value")
 
         value = float(raw)
 
@@ -233,24 +206,17 @@ def prepare_dataset(
     source_dir: Path,
     output_dir: Path,
 ) -> Path:
-    archive_path = (
-        source_dir
-        / f"{spec.dataset_id}.zip"
-    )
+    archive_path = source_dir / f"{spec.dataset_id}.zip"
 
     if archive_path.exists():
         outer_bytes = archive_path.read_bytes()
     else:
-        outer_bytes = download_bytes(
-            spec.download_url
-        )
+        outer_bytes = download_bytes(spec.download_url)
         archive_path.parent.mkdir(
             parents=True,
             exist_ok=True,
         )
-        archive_path.write_bytes(
-            outer_bytes
-        )
+        archive_path.write_bytes(outer_bytes)
 
     require_sha256(
         outer_bytes,
@@ -268,10 +234,7 @@ def prepare_dataset(
         rows,
     )
 
-    output_path = (
-        output_dir
-        / spec.canonical_file
-    )
+    output_path = output_dir / spec.canonical_file
 
     write_canonical(
         output_path,
@@ -279,9 +242,7 @@ def prepare_dataset(
     )
 
     canonical_bytes = output_path.read_bytes()
-    canonical_sha256 = sha256_bytes(
-        canonical_bytes
-    )
+    canonical_sha256 = sha256_bytes(canonical_bytes)
 
     if canonical_sha256 != spec.canonical_sha256:
         raise ValueError(
@@ -302,18 +263,13 @@ def prepare_dataset(
 
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description=(
-            "Prepare the frozen Lasagna 2 real-world "
-            "validation corpus."
-        )
+        description=("Prepare the frozen Lasagna 2 real-world " "validation corpus.")
     )
 
     parser.add_argument(
         "--manifest",
         type=Path,
-        default=Path(
-            "data/real-world/manifest.tsv"
-        ),
+        default=Path("data/real-world/manifest.tsv"),
     )
 
     parser.add_argument(
@@ -325,9 +281,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path(
-            "data/real-world/canonical"
-        ),
+        default=Path("data/real-world/canonical"),
     )
 
     return parser
@@ -336,9 +290,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
 def main() -> int:
     args = build_arg_parser().parse_args()
 
-    specs = load_manifest(
-        args.manifest
-    )
+    specs = load_manifest(args.manifest)
 
     for spec in specs:
         prepare_dataset(

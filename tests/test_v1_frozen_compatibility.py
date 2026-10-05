@@ -39,9 +39,7 @@ def _reference_encoding_parameters(
             offset,
         )
 
-        segment_lengths.append(
-            end_idx - start_idx + 1
-        )
+        segment_lengths.append(end_idx - start_idx + 1)
 
         offset += core.SEGMENT_ENTRY_STRUCT.size
 
@@ -49,18 +47,13 @@ def _reference_encoding_parameters(
 
     segment_length = segment_lengths[0]
 
-    assert all(
-        length == segment_length
-        for length in segment_lengths[:-1]
-    )
+    assert all(length == segment_length for length in segment_lengths[:-1])
     assert segment_lengths[-1] <= segment_length
 
-    coding_type = (
-        core.RESIDUAL_SECTION_HEADER_STRUCT.unpack_from(
-            reference,
-            offset,
-        )[0]
-    )
+    coding_type = core.RESIDUAL_SECTION_HEADER_STRUCT.unpack_from(
+        reference,
+        offset,
+    )[0]
 
     residual_coding = {
         core.RESIDUAL_CODEC_RAW_INT32: "raw",
@@ -87,10 +80,7 @@ def test_frozen_v1_corpus_remains_decodable_and_byte_identical() -> None:
     total_reference_bytes = 0
 
     for row in rows:
-        raw = (
-            CORPUS_ROOT
-            / row["case_path"]
-        ).read_bytes()
+        raw = (CORPUS_ROOT / row["case_path"]).read_bytes()
 
         assert len(raw) % 8 == 0
 
@@ -101,20 +91,11 @@ def test_frozen_v1_corpus_remains_decodable_and_byte_identical() -> None:
             )
         )
 
-        reference = (
-            CORPUS_ROOT
-            / row["reference_path"]
-        ).read_bytes()
+        reference = (CORPUS_ROOT / row["reference_path"]).read_bytes()
 
-        decoded = core.decode_timeseries(
-            reference
-        )
+        decoded = core.decode_timeseries(reference)
 
-        segment_length, residual_coding = (
-            _reference_encoding_parameters(
-                reference
-            )
-        )
+        segment_length, residual_coding = _reference_encoding_parameters(reference)
 
         ts = core.TimeSeries(
             values=values,

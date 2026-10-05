@@ -99,33 +99,20 @@ def load_sweep(path: Path) -> list[SweepConfig]:
             axis=row["axis"],
             C_Q=float(row["C_Q"]),
             Q_MIN=float(row["Q_MIN"]),
-            min_segment_length=int(
-                row["min_segment_length"]
-            ),
-            max_segment_length=int(
-                row["max_segment_length"]
-            ),
-            mse_threshold=float(
-                row["mse_threshold"]
-            ),
+            min_segment_length=int(row["min_segment_length"]),
+            max_segment_length=int(row["max_segment_length"]),
+            mse_threshold=float(row["mse_threshold"]),
         )
         for row in rows
     ]
 
     if not configs:
-        raise ValueError(
-            "Sweep matrix contains no configurations"
-        )
+        raise ValueError("Sweep matrix contains no configurations")
 
-    config_ids = [
-        config.config_id
-        for config in configs
-    ]
+    config_ids = [config.config_id for config in configs]
 
     if len(config_ids) != len(set(config_ids)):
-        raise ValueError(
-            "Sweep matrix contains duplicate config_id values"
-        )
+        raise ValueError("Sweep matrix contains duplicate config_id values")
 
     return configs
 
@@ -141,19 +128,11 @@ def segment_metrics(
     ) = read_lsg2_metadata_and_segments(encoded)
 
     if not segments:
-        raise ValueError(
-            "Non-empty benchmark series produced no segments"
-        )
+        raise ValueError("Non-empty benchmark series produced no segments")
 
-    lengths = [
-        segment.end_idx - segment.start_idx + 1
-        for segment in segments
-    ]
+    lengths = [segment.end_idx - segment.start_idx + 1 for segment in segments]
 
-    predictors = Counter(
-        segment.predictor_type
-        for segment in segments
-    )
+    predictors = Counter(segment.predictor_type for segment in segments)
 
     return (
         len(segments),
@@ -189,22 +168,16 @@ def evaluate(
             C_Q=config.C_Q,
             Q_MIN=config.Q_MIN,
             segment_mode="adaptive",
-            min_segment_length=(
-                config.min_segment_length
-            ),
-            max_segment_length=(
-                config.max_segment_length
-            ),
+            min_segment_length=(config.min_segment_length),
+            max_segment_length=(config.max_segment_length),
             mse_threshold=config.mse_threshold,
             residual_coding="varint",
         )
 
-    encoded, encode_time_ms = (
-        _measure_deterministic_encode(
-            encode,
-            repetitions=repetitions,
-            warmup=warmup,
-        )
+    encoded, encode_time_ms = _measure_deterministic_encode(
+        encode,
+        repetitions=repetitions,
+        warmup=warmup,
     )
 
     decoded, decode_time_ms = _median_call_ms(
@@ -228,9 +201,7 @@ def evaluate(
         predictors,
     ) = segment_metrics(encoded)
 
-    raw_bytes = len(
-        canonical_float64_bytes(values)
-    )
+    raw_bytes = len(canonical_float64_bytes(values))
     encoded_bytes = len(encoded)
 
     return {
@@ -240,44 +211,24 @@ def evaluate(
         "axis": config.axis,
         "C_Q": config.C_Q,
         "Q_MIN": config.Q_MIN,
-        "min_segment_length": (
-            config.min_segment_length
-        ),
-        "max_segment_length": (
-            config.max_segment_length
-        ),
+        "min_segment_length": (config.min_segment_length),
+        "max_segment_length": (config.max_segment_length),
         "mse_threshold": config.mse_threshold,
         "n_samples": len(values),
         "raw_bytes": raw_bytes,
         "encoded_bytes": encoded_bytes,
-        "bits_per_sample": (
-            encoded_bytes * 8.0 / len(values)
-        ),
-        "compression_ratio": (
-            raw_bytes / encoded_bytes
-        ),
+        "bits_per_sample": (encoded_bytes * 8.0 / len(values)),
+        "compression_ratio": (raw_bytes / encoded_bytes),
         "mse": mse,
         "rmse": rmse,
         "max_abs_error": max_abs_error,
         "segment_count": segment_count,
-        "mean_segment_length": (
-            mean_segment_length
-        ),
-        "min_observed_segment_length": (
-            min_observed_segment_length
-        ),
-        "max_observed_segment_length": (
-            max_observed_segment_length
-        ),
-        "mean_predictor_segments": (
-            predictors.get(0, 0)
-        ),
-        "linear_predictor_segments": (
-            predictors.get(1, 0)
-        ),
-        "rw_predictor_segments": (
-            predictors.get(2, 0)
-        ),
+        "mean_segment_length": (mean_segment_length),
+        "min_observed_segment_length": (min_observed_segment_length),
+        "max_observed_segment_length": (max_observed_segment_length),
+        "mean_predictor_segments": (predictors.get(0, 0)),
+        "linear_predictor_segments": (predictors.get(1, 0)),
+        "rw_predictor_segments": (predictors.get(2, 0)),
         "encode_time_ms": encode_time_ms,
         "decode_time_ms": decode_time_ms,
     }
@@ -321,26 +272,20 @@ def write_results(
                 "encode_time_ms",
                 "decode_time_ms",
             ):
-                serialized[key] = (
-                    f"{float(serialized[key]):.12g}"
-                )
+                serialized[key] = f"{float(serialized[key]):.12g}"
 
             writer.writerow(serialized)
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description=(
-            "Execute the frozen Lasagna V2 sensitivity sweep."
-        )
+        description=("Execute the frozen Lasagna V2 sensitivity sweep.")
     )
 
     parser.add_argument(
         "--matrix",
         type=Path,
-        default=Path(
-            "docs/sensitivity-sweep.tsv"
-        ),
+        default=Path("docs/sensitivity-sweep.tsv"),
     )
 
     parser.add_argument(
@@ -373,9 +318,7 @@ def main() -> int:
 
     for evidence_group, dataset_path in DATASETS:
         if not dataset_path.is_file():
-            raise ValueError(
-                f"Missing dataset: {dataset_path}"
-            )
+            raise ValueError(f"Missing dataset: {dataset_path}")
 
         for config in configs:
             row = evaluate(
@@ -396,14 +339,10 @@ def main() -> int:
                 f"SEGMENTS={row['segment_count']}"
             )
 
-    expected_rows = (
-        len(configs) * len(DATASETS)
-    )
+    expected_rows = len(configs) * len(DATASETS)
 
     if len(rows) != expected_rows:
-        raise ValueError(
-            f"Expected {expected_rows} results, got {len(rows)}"
-        )
+        raise ValueError(f"Expected {expected_rows} results, got {len(rows)}")
 
     write_results(
         rows,
