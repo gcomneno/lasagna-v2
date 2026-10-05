@@ -190,3 +190,5 @@ temp/
 !.secrets.baseline
 !docs/performance-benchmark-results.csv
 !docs/performance-benchmark-environment.json
+!docs/predictor-candidate-results.csv
+!docs/predictor-candidate-winners.csv
