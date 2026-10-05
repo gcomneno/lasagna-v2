@@ -150,8 +150,8 @@ Zero-run residual coding has been explored as a research candidate, but it is
 
 ## V1 and V2 wire formats
 
-Lasagna intentionally keeps V1 readable while introducing V2 as an explicit
-format.
+Lasagna keeps V1 readable and reproducible while using V2 as the current
+default wire format.
 
 ### V1 — compatibility baseline
 
@@ -161,7 +161,9 @@ V1 stores a 64-byte segment entry:
 <6Iddddd>
 ```
 
-The public encoder remains the compatibility default.
+V1 is retained as the legacy compatibility format. New encodes use V2 by
+default; use the explicit V1 API or CLI format selector when byte-compatible
+legacy output is required.
 
 ### V2 — frozen L32 layout
 
@@ -208,12 +210,12 @@ python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
 ```
 
-### Encode using the historical V1 default
+### Encode using the V2 default
 
 ```bash
 lasagna2 encode \
   data/examples/trend.csv \
-  /tmp/trend-v1.lsg2 \
+  /tmp/trend-v2.lsg2 \
   --dt 1 \
   --t0 1970-01-01T00:00:00Z \
   --unit arbitrary \
@@ -225,25 +227,25 @@ Equivalent explicit form:
 ```bash
 lasagna2 encode \
   data/examples/trend.csv \
-  /tmp/trend-v1.lsg2 \
-  --dt 1 \
-  --t0 1970-01-01T00:00:00Z \
-  --unit arbitrary \
-  --predictor linear \
-  --format-version 1
-```
-
-### Encode using V2
-
-```bash
-lasagna2 encode \
-  data/examples/trend.csv \
   /tmp/trend-v2.lsg2 \
   --dt 1 \
   --t0 1970-01-01T00:00:00Z \
   --unit arbitrary \
   --predictor linear \
   --format-version 2
+```
+
+### Encode legacy V1 explicitly
+
+```bash
+lasagna2 encode \
+  data/examples/trend.csv \
+  /tmp/trend-v1.lsg2 \
+  --dt 1 \
+  --t0 1970-01-01T00:00:00Z \
+  --unit arbitrary \
+  --predictor linear \
+  --format-version 1
 ```
 
 ### Decode
@@ -268,7 +270,7 @@ lasagna2 info /tmp/trend-v2.lsg2 -v
 
 ## Python API
 
-V1 remains the compatibility-default encoder:
+`encode_timeseries()` uses V2 by default:
 
 ```python
 from lasagna2 import TimeSeries, decode_timeseries, encode_timeseries
@@ -280,18 +282,21 @@ ts = TimeSeries(
     unit="arbitrary",
 )
 
-encoded_v1 = encode_timeseries(
+encoded_v2 = encode_timeseries(
     ts,
     predictor="linear",
 )
 
-decoded = decode_timeseries(encoded_v1)
+decoded = decode_timeseries(encoded_v2)
 ```
 
-V2 is explicit:
+Explicit V2 encoding remains available through `encode_timeseries_v2()`.
+
+Legacy V1 output is available explicitly when byte-compatible V1 encoding is
+required:
 
 ```python
-from lasagna2 import TimeSeries, decode_timeseries, encode_timeseries_v2
+from lasagna2 import TimeSeries, decode_timeseries, encode_timeseries_v1
 
 ts = TimeSeries(
     values=[0.1 * i for i in range(200)],
@@ -300,12 +305,12 @@ ts = TimeSeries(
     unit="arbitrary",
 )
 
-encoded_v2 = encode_timeseries_v2(
+encoded_v1 = encode_timeseries_v1(
     ts,
     predictor="linear",
 )
 
-decoded = decode_timeseries(encoded_v2)
+decoded = decode_timeseries(encoded_v1)
 ```
 
 `decode_timeseries()` accepts both supported wire versions.

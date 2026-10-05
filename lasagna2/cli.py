@@ -18,7 +18,7 @@ from .core import (
     SegmentEntry,
     TimeSeries,
     decode_timeseries,
-    encode_timeseries,
+    encode_timeseries_v1,
     encode_timeseries_v2,
 )
 
@@ -360,12 +360,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p_enc.add_argument(
         "--format-version",
         type=int,
-        default=FORMAT_VERSION_V1,
+        default=FORMAT_VERSION_V2,
         choices=[
             FORMAT_VERSION_V1,
             FORMAT_VERSION_V2,
         ],
-        help=("LSG2 wire format version " "(default: 1; use 2 for frozen L32 V2)"),
+        help=("LSG2 wire format version " "(default: 2; use 1 for legacy V1 output)"),
     )
     p_enc.set_defaults(func=cli_encode)
 
@@ -419,11 +419,11 @@ def cli_encode(args: argparse.Namespace) -> None:
     format_version = getattr(
         args,
         "format_version",
-        FORMAT_VERSION_V1,
+        FORMAT_VERSION_V2,
     )
 
     if format_version == FORMAT_VERSION_V1:
-        encoder = encode_timeseries
+        encoder = encode_timeseries_v1
     elif format_version == FORMAT_VERSION_V2:
         encoder = encode_timeseries_v2
     else:

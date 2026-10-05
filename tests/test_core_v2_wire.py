@@ -11,7 +11,7 @@ def _header(data: bytes):
     )
 
 
-def test_v1_encoder_still_emits_version_1() -> None:
+def test_explicit_v1_encoder_still_emits_version_1() -> None:
     ts = core.TimeSeries(
         values=[1.0, 2.0, 3.0, 4.0],
         dt=1.0,
@@ -19,14 +19,39 @@ def test_v1_encoder_still_emits_version_1() -> None:
         unit="test",
     )
 
-    encoded = core.encode_timeseries(
+    encoded = core.encode_timeseries_v1(
         ts,
         segment_length=4,
         predictor="linear",
         residual_coding="raw",
     )
 
-    assert _header(encoded)[1] == (core.FORMAT_VERSION_V1)
+    assert _header(encoded)[1] == core.FORMAT_VERSION_V1
+
+
+def test_default_encoder_emits_version_2() -> None:
+    ts = core.TimeSeries(
+        values=[1.0, 2.0, 3.0, 4.0],
+        dt=1.0,
+        t0="1970-01-01T00:00:00Z",
+        unit="test",
+    )
+
+    default_bytes = core.encode_timeseries(
+        ts,
+        segment_length=4,
+        predictor="linear",
+        residual_coding="raw",
+    )
+    explicit_v2_bytes = core.encode_timeseries_v2(
+        ts,
+        segment_length=4,
+        predictor="linear",
+        residual_coding="raw",
+    )
+
+    assert _header(default_bytes)[1] == core.FORMAT_VERSION_V2
+    assert default_bytes == explicit_v2_bytes
 
 
 def test_v2_linear_raw_byte_layout() -> None:
@@ -203,7 +228,7 @@ def test_public_decoder_preserves_v1_path() -> None:
         unit="unit",
     )
 
-    encoded = core.encode_timeseries(
+    encoded = core.encode_timeseries_v1(
         ts,
         segment_length=4,
         predictor="linear",

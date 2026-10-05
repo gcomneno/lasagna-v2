@@ -492,7 +492,7 @@ def build_context_json(ts: TimeSeries) -> bytes:
 # ---------------------------------------------------------------------------
 # Codec: encode / decode
 # ---------------------------------------------------------------------------
-def encode_timeseries(
+def encode_timeseries_v1(
     ts: TimeSeries,
     segment_length: int = 64,
     predictor: str = "linear",
@@ -1078,7 +1078,7 @@ def encode_timeseries_v2(
     Random-walk encoding preserves the frozen semantic rule: samples after
     the seed are predicted from the previous ORIGINAL sample.
     """
-    v1_reference = encode_timeseries(
+    v1_reference = encode_timeseries_v1(
         ts,
         segment_length=segment_length,
         predictor=predictor,
@@ -1402,6 +1402,34 @@ def _decode_timeseries_v2(data: bytes) -> TimeSeries:
 
     return _decode_timeseries_v1(
         bytes(expanded)
+    )
+
+
+
+def encode_timeseries(
+    ts: TimeSeries,
+    segment_length: int = 64,
+    predictor: str = "linear",
+    C_Q: float = 0.5,
+    Q_MIN: float = 1e-6,
+    segment_mode: str = "fixed",
+    min_segment_length: int = 32,
+    max_segment_length: int = 128,
+    mse_threshold: float = 0.5,
+    residual_coding: str = "raw",
+) -> bytes:
+    """Encode a TimeSeries using the current default V2 wire format."""
+    return encode_timeseries_v2(
+        ts,
+        segment_length=segment_length,
+        predictor=predictor,
+        C_Q=C_Q,
+        Q_MIN=Q_MIN,
+        segment_mode=segment_mode,
+        min_segment_length=min_segment_length,
+        max_segment_length=max_segment_length,
+        mse_threshold=mse_threshold,
+        residual_coding=residual_coding,
     )
 
 

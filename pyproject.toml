@@ -1,6 +1,6 @@
 [project]
 name = "lasagna-v2"
-version = "0.2.2"
+version = "0.3.0"
 description = "Experimental predictive codec for structured univariate time series"
 authors = [
   { name = "Giancarlo" }

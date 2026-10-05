@@ -59,7 +59,7 @@ def _version(data: bytes) -> int:
     return core.FILE_HEADER_STRUCT.unpack_from(data, 0)[1]
 
 
-def test_encode_parser_defaults_to_v1() -> None:
+def test_encode_parser_defaults_to_v2() -> None:
     parser = cli.build_arg_parser()
 
     args = parser.parse_args(
@@ -76,7 +76,7 @@ def test_encode_parser_defaults_to_v1() -> None:
         ]
     )
 
-    assert args.format_version == (core.FORMAT_VERSION_V1)
+    assert args.format_version == core.FORMAT_VERSION_V2
 
 
 def test_encode_parser_accepts_explicit_v2() -> None:
@@ -122,20 +122,22 @@ def test_encode_parser_rejects_unknown_version() -> None:
         )
 
 
-def test_public_api_exports_v2_encoder() -> None:
+def test_public_api_exports_v1_and_v2_encoders() -> None:
+    assert lasagna2.encode_timeseries is core.encode_timeseries
+    assert lasagna2.encode_timeseries_v1 is core.encode_timeseries_v1
     assert lasagna2.encode_timeseries_v2 is core.encode_timeseries_v2
 
-    assert "encode_timeseries_v2" in (lasagna2.__all__)
+    assert "encode_timeseries" in lasagna2.__all__
+    assert "encode_timeseries_v1" in lasagna2.__all__
+    assert "encode_timeseries_v2" in lasagna2.__all__
 
-    assert lasagna2.encode_timeseries is core.encode_timeseries
 
-
-def test_cli_v1_default_and_explicit_v1_are_identical(
+def test_cli_default_and_explicit_v2_are_identical(
     tmp_path: Path,
 ) -> None:
     source = tmp_path / "input.csv"
     default_output = tmp_path / "default.lsg2"
-    explicit_output = tmp_path / "explicit-v1.lsg2"
+    explicit_output = tmp_path / "explicit-v2.lsg2"
 
     _write_linear_csv(source)
 
@@ -151,17 +153,35 @@ def test_cli_v1_default_and_explicit_v1_are_identical(
             source,
             explicit_output,
             "--format-version",
-            "1",
+            "2",
         )
     )
 
     default_bytes = default_output.read_bytes()
-
     explicit_bytes = explicit_output.read_bytes()
 
     assert default_bytes == explicit_bytes
+    assert _version(default_bytes) == core.FORMAT_VERSION_V2
 
-    assert _version(default_bytes) == core.FORMAT_VERSION_V1
+
+def test_cli_explicit_v1_remains_available(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "input.csv"
+    output = tmp_path / "explicit-v1.lsg2"
+
+    _write_linear_csv(source)
+
+    cli.main(
+        _encode_args(
+            source,
+            output,
+            "--format-version",
+            "1",
+        )
+    )
+
+    assert _version(output.read_bytes()) == core.FORMAT_VERSION_V1
 
 
 def test_cli_v2_encode_decode_and_info(
@@ -245,6 +265,8 @@ def test_cli_info_preserves_v1_label(
         _encode_args(
             source,
             encoded,
+            "--format-version",
+            "1",
         )
     )
 

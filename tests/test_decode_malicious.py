@@ -1,6 +1,8 @@
 # tests/test_decode_malicious.py
 from __future__ import annotations
 
+from lasagna2 import encode_timeseries_v1
+
 from lasagna2.core import TimeSeries, encode_timeseries, decode_timeseries
 
 
@@ -36,7 +38,13 @@ def test_decode_bad_magic_raises_valueerror():
 def test_decode_suspicious_npoints_raises_valueerror():
     values = [0.1 * i for i in range(20)]
     ts = TimeSeries(values=values, dt=60.0, t0="2025-01-01T00:00:00Z", unit="kW")
-    data = bytearray(encode_timeseries(ts, segment_length=10, predictor="linear"))
+    data = bytearray(
+        encode_timeseries_v1(
+            ts,
+            segment_length=10,
+            predictor="linear",
+        )
+    )
 
     # manomette il campo n_points nel header (posizione 4sHHI I = offset 4+2+2+4=12)
     # FILE_HEADER_STRUCT = "<4sHHIIIII"

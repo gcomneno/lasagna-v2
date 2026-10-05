@@ -1,3 +1,50 @@
+# Lasagna 2 — v0.3.0
+
+This release makes the frozen V2 wire format the default encoding path while
+retaining explicit V1 encoding and full V1/V2 decode compatibility.
+
+## Highlights
+
+- `encode_timeseries()` now emits V2 by default.
+- CLI `lasagna2 encode` now defaults to wire format V2.
+- New public `encode_timeseries_v1()` API for explicit legacy V1 output.
+- Existing public `encode_timeseries_v2()` remains available.
+- CLI `--format-version 1` remains available for explicit legacy V1 output.
+- `decode_timeseries()` continues to auto-detect and decode both V1 and V2.
+- Existing V1 artifacts remain readable and the frozen V1 reference corpus
+  remains the compatibility baseline.
+- V1 is now compatibility-only; new encoder development targets V2.
+
+## Compatibility note
+
+This is a behavioral change for callers that previously relied on the default
+encoder producing V1 bytes.
+
+In v0.3.0:
+
+```text
+encode_timeseries()    -> V2
+encode_timeseries_v2() -> V2
+encode_timeseries_v1() -> V1
+```
+
+Likewise, CLI encoding without `--format-version` now produces V2.
+
+Callers requiring byte-compatible V1 output must use
+`encode_timeseries_v1()` or `--format-version 1`.
+
+Package version `0.3.0` and wire-format version `2` are separate version
+domains. Existing V1 files remain supported by the decoder.
+
+The V2 default transition follows the frozen-layout validation completed in
+v0.2.2 and the subsequent independent road test confirming deterministic V2
+encoding, V1/V2 decode compatibility, and materially smaller V2 output without
+a meaningful reconstruction-quality change.
+
+The project remains experimental research software.
+
+---
+
 # Lasagna 2 — v0.2.2 (2026-10-03)
 
 This release completes the current V2 physical-layout validation cycle
