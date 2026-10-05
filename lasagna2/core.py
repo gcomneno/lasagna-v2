@@ -492,6 +492,213 @@ def build_context_json(ts: TimeSeries) -> bytes:
 # ---------------------------------------------------------------------------
 # Codec: encode / decode
 # ---------------------------------------------------------------------------
+def _build_encoding_model(
+    ts: TimeSeries,
+    segment_length: int = 64,
+    predictor: str = "linear",
+    C_Q: float = 0.5,
+    Q_MIN: float = 1e-6,
+    segment_mode: str = "fixed",
+    min_segment_length: int = 32,
+    max_segment_length: int = 128,
+    mse_threshold: float = 0.5,
+) -> tuple[bytes, list[SegmentEntry], list[list[int]]]:
+    """
+    Build the format-independent encoding model shared by V1 and V2.
+
+    Returns:
+        context bytes,
+        segment metadata,
+        V1-semantic quantized residuals.
+    """
+    values = ts.values
+    n_points = len(values)
+
+    if n_points == 0:
+        raise ValueError("TimeSeries is empty")
+
+    predictor_map = {
+        "mean": 0,
+        "linear": 1,
+        "rw": 2,
+    }
+
+    if predictor == "auto":
+        default_predictor_type = None
+        predictor_type_for_segmentation = 1
+    else:
+        if predictor not in predictor_map:
+            raise ValueError(
+                f"Unknown predictor '{predictor}', "
+                f"expected one of {list(predictor_map) + ['auto']}"
+            )
+
+        default_predictor_type = predictor_map[predictor]
+        predictor_type_for_segmentation = default_predictor_type
+
+    if segment_mode == "fixed":
+        segment_ranges = segment_series_fixed_length(
+            n_points,
+            segment_length,
+        )
+    elif segment_mode == "adaptive":
+        segment_ranges = segment_series_adaptive(
+            values,
+            predictor_type=predictor_type_for_segmentation,
+            min_len=min_segment_length,
+            max_len=max_segment_length,
+            mse_threshold=mse_threshold,
+        )
+    else:
+        raise ValueError(
+            "segment_mode must be 'fixed' or 'adaptive'"
+        )
+
+    segments: list[SegmentEntry] = []
+    q_resid_segments: list[list[int]] = []
+
+    for start, end in segment_ranges:
+        x_seg = values[start : end + 1]
+        length = len(x_seg)
+
+        mean, slope, intercept, _var = compute_stats(x_seg)
+        seed_value = x_seg[0] if x_seg else 0.0
+
+        if predictor == "auto":
+            best_type = None
+            best_mse = float("inf")
+
+            for cand_type in (0, 1, 2):
+                preds_c = _build_preds_for_segmentation(
+                    x_seg,
+                    predictor_type=cand_type,
+                    mean=mean,
+                    slope=slope,
+                    intercept=intercept,
+                    seed_value=seed_value,
+                )
+
+                residuals_c = [
+                    value - pred
+                    for value, pred in zip(
+                        x_seg,
+                        preds_c,
+                    )
+                ]
+
+                q_res_c, Q_c = quantize_residuals(
+                    residuals_c,
+                    C_Q=C_Q,
+                    Q_MIN=Q_MIN,
+                )
+
+                x_hat_c = [0.0] * length
+
+                if cand_type in (0, 1):
+                    for index in range(length):
+                        x_hat_c[index] = (
+                            preds_c[index]
+                            + q_res_c[index] * Q_c
+                        )
+                else:
+                    if length > 0:
+                        preds_dec = [0.0] * length
+                        preds_dec[0] = seed_value
+
+                        x_hat_c[0] = (
+                            preds_dec[0]
+                            + q_res_c[0] * Q_c
+                        )
+
+                        for index in range(1, length):
+                            preds_dec[index] = (
+                                x_hat_c[index - 1]
+                            )
+
+                            x_hat_c[index] = (
+                                preds_dec[index]
+                                + q_res_c[index] * Q_c
+                            )
+
+                if length > 0:
+                    mse_c = (
+                        sum(
+                            (value - reconstructed) ** 2
+                            for value, reconstructed in zip(
+                                x_seg,
+                                x_hat_c,
+                            )
+                        )
+                        / length
+                    )
+                else:
+                    mse_c = 0.0
+
+                if mse_c < best_mse:
+                    best_mse = mse_c
+                    best_type = cand_type
+
+            if best_type is None:
+                best_type = 0
+
+            predictor_type_seg = best_type
+
+            preds = _build_preds_for_segmentation(
+                x_seg,
+                predictor_type=predictor_type_seg,
+                mean=mean,
+                slope=slope,
+                intercept=intercept,
+                seed_value=seed_value,
+            )
+        else:
+            predictor_type_seg = default_predictor_type
+
+            preds = _build_preds_for_segmentation(
+                x_seg,
+                predictor_type=predictor_type_seg,
+                mean=mean,
+                slope=slope,
+                intercept=intercept,
+                seed_value=seed_value,
+            )
+
+        residuals = [
+            value - pred
+            for value, pred in zip(
+                x_seg,
+                preds,
+            )
+        ]
+
+        q_res, Q = quantize_residuals(
+            residuals,
+            C_Q=C_Q,
+            Q_MIN=Q_MIN,
+        )
+
+        segments.append(
+            SegmentEntry(
+                start_idx=start,
+                end_idx=end,
+                predictor_type=predictor_type_seg,
+                mean=mean,
+                slope=slope,
+                intercept=intercept,
+                quant_step_Q=Q,
+                seed_value=seed_value,
+            )
+        )
+
+        q_resid_segments.append(q_res)
+
+    return (
+        build_context_json(ts),
+        segments,
+        q_resid_segments,
+    )
+
+
 def encode_timeseries_v1(
     ts: TimeSeries,
     segment_length: int = 64,
@@ -504,182 +711,41 @@ def encode_timeseries_v1(
     mse_threshold: float = 0.5,
     residual_coding: str = "raw",
 ) -> bytes:
-    """
-    Encode a TimeSeries into Lasagna MVP bytes (.lsg2).
+    """Encode a TimeSeries using the legacy V1 wire format."""
+    (
+        ctx_bytes,
+        segments,
+        q_resid_segments,
+    ) = _build_encoding_model(
+        ts,
+        segment_length=segment_length,
+        predictor=predictor,
+        C_Q=C_Q,
+        Q_MIN=Q_MIN,
+        segment_mode=segment_mode,
+        min_segment_length=min_segment_length,
+        max_segment_length=max_segment_length,
+        mse_threshold=mse_threshold,
+    )
 
-    Args:
-        ts: TimeSeries object.
-        segment_length: fixed segment length (used if segment_mode='fixed').
-        predictor: 'mean', 'linear', 'rw', or 'auto' (choose per segment).
-        C_Q: coefficient for quantization step Q.
-        Q_MIN: minimum Q to avoid zero.
-        segment_mode: 'fixed' or 'adaptive'.
-        min_segment_length: min length for adaptive segmentation.
-        max_segment_length: max length for adaptive segmentation.
-        mse_threshold: max allowed MSE to extend a segment (adaptive).
-        residual_coding: 'raw' (int32) or 'varint' (ZigZag+varint).
-    """
-    values = ts.values
-    n_points = len(values)
-    if n_points == 0:
-        raise ValueError("TimeSeries is empty")
+    n_points = len(ts.values)
+    n_segments = len(segments)
 
-    predictor_map = {
-        "mean": 0,
-        "linear": 1,
-        "rw": 2,
-    }
-
-    if predictor == "auto":
-        default_predictor_type = None
-        predictor_type_for_segmentation = 1  # linear come modello di fondo
-    else:
-        if predictor not in predictor_map:
-            raise ValueError(
-                f"Unknown predictor '{predictor}', "
-                f"expected one of {list(predictor_map) + ['auto']}"
-            )
-        default_predictor_type = predictor_map[predictor]
-        predictor_type_for_segmentation = default_predictor_type
-
-    # 1) Segmentazione
-    if segment_mode == "fixed":
-        segment_ranges = segment_series_fixed_length(n_points, segment_length)
-    elif segment_mode == "adaptive":
-        segment_ranges = segment_series_adaptive(
-            values,
-            predictor_type=predictor_type_for_segmentation,
-            min_len=min_segment_length,
-            max_len=max_segment_length,
-            mse_threshold=mse_threshold,
-        )
-    else:
-        raise ValueError("segment_mode must be 'fixed' or 'adaptive'")
-
-    segments: List[SegmentEntry] = []
-    q_resid_segments: List[List[int]] = []
-
-    # 2) Costruzione segmenti
-    for start, end in segment_ranges:
-        x_seg = values[start : end + 1]
-        length = len(x_seg)
-        mean, slope, intercept, _var = compute_stats(x_seg)
-        seed_value = x_seg[0] if x_seg else 0.0
-
-        # Scegli il predittore per questo segmento
-        if predictor == "auto":
-            best_type = None
-            best_mse = float("inf")
-
-            # prova mean, linear, rw
-            for cand_type in (0, 1, 2):
-                # 1) predizioni
-                preds_c = _build_preds_for_segmentation(
-                    x_seg,
-                    predictor_type=cand_type,
-                    mean=mean,
-                    slope=slope,
-                    intercept=intercept,
-                    seed_value=seed_value,
-                )
-
-                # 2) residui + quantizzazione
-                residuals_c = [v - p for v, p in zip(x_seg, preds_c)]
-                q_res_c, Q_c = quantize_residuals(residuals_c, C_Q=C_Q, Q_MIN=Q_MIN)
-
-                # 3) decode locale e MSE finale
-                x_hat_c = [0.0] * length
-                if cand_type in (0, 1):
-                    # mean / linear: predizioni indipendenti
-                    preds_dec = preds_c
-                    for i in range(length):
-                        x_hat_c[i] = preds_dec[i] + q_res_c[i] * Q_c
-                elif cand_type == 2:
-                    # random-walk: ricostruzione iterativa
-                    if length > 0:
-                        preds_dec = [0.0] * length
-                        preds_dec[0] = seed_value
-                        x_hat_c[0] = preds_dec[0] + q_res_c[0] * Q_c
-                        for i in range(1, length):
-                            preds_dec[i] = x_hat_c[i - 1]
-                            x_hat_c[i] = preds_dec[i] + q_res_c[i] * Q_c
-
-                if length > 0:
-                    mse_c = sum((v - h) ** 2 for v, h in zip(x_seg, x_hat_c)) / length
-                else:
-                    mse_c = 0.0
-
-                if mse_c < best_mse:
-                    best_mse = mse_c
-                    best_type = cand_type
-
-            if best_type is None:
-                best_type = 0  # fallback paranoico
-
-            predictor_type_seg = best_type
-            # predizioni "buone" per l'encode reale
-            preds = _build_preds_for_segmentation(
-                x_seg,
-                predictor_type=predictor_type_seg,
-                mean=mean,
-                slope=slope,
-                intercept=intercept,
-                seed_value=seed_value,
-            )
-        else:
-            predictor_type_seg = default_predictor_type  # type: ignore[assignment]
-            preds = _build_preds_for_segmentation(
-                x_seg,
-                predictor_type=predictor_type_seg,
-                mean=mean,
-                slope=slope,
-                intercept=intercept,
-                seed_value=seed_value,
-            )
-
-        residuals = [v - p for v, p in zip(x_seg, preds)]
-        q_res, Q = quantize_residuals(residuals, C_Q=C_Q, Q_MIN=Q_MIN)
-
-        seg = SegmentEntry(
-            start_idx=start,
-            end_idx=end,
-            predictor_type=predictor_type_seg,
-            mean=mean,
-            slope=slope,
-            intercept=intercept,
-            quant_step_Q=Q,
-            seed_value=seed_value,
-        )
-        segments.append(seg)
-        q_resid_segments.append(q_res)
-
-    # 3) Costruzione buffer binario
     buf = bytearray()
 
-    ctx_bytes = build_context_json(ts)
-    header_len = len(ctx_bytes)
-
-    magic = b"LSG2"
-    version = 1
-    flags = 0
-    n_segments = len(segments)
-    reserved1 = 0
-    reserved2 = 0
-
     buf += FILE_HEADER_STRUCT.pack(
-        magic,
-        version,
-        flags,
-        header_len,
+        b"LSG2",
+        FORMAT_VERSION_V1,
+        0,
+        len(ctx_bytes),
         n_points,
         n_segments,
-        reserved1,
-        reserved2,
+        0,
+        0,
     )
 
     buf += ctx_bytes
 
-    # Tabella segmenti
     for seg in segments:
         buf += SEGMENT_ENTRY_STRUCT.pack(
             seg.start_idx,
@@ -695,14 +761,14 @@ def encode_timeseries_v1(
             seg.seed_value,
         )
 
-    # Header sezione residui
     if residual_coding == "raw":
-        coding_type = 0
+        coding_type = RESIDUAL_CODEC_RAW_INT32
     elif residual_coding == "varint":
-        coding_type = 1
+        coding_type = RESIDUAL_CODEC_VARINT
     else:
         raise ValueError(
-            f"Unknown residual_coding '{residual_coding}', expected 'raw' or 'varint'"
+            f"Unknown residual_coding '{residual_coding}', "
+            "expected 'raw' or 'varint'"
         )
 
     buf += RESIDUAL_SECTION_HEADER_STRUCT.pack(
@@ -712,19 +778,35 @@ def encode_timeseries_v1(
         0,
     )
 
-    # Blocchi residui
-    for seg_id, q_res in enumerate(q_resid_segments):
+    for seg_id, q_res in enumerate(
+        q_resid_segments
+    ):
         seg_len = len(q_res)
-        if coding_type == 0:
+
+        if coding_type == RESIDUAL_CODEC_RAW_INT32:
             byte_len = seg_len * 4
-            buf += RESIDUAL_BLOCK_HEADER_STRUCT.pack(seg_id, seg_len, byte_len)
-            if seg_len > 0:
-                buf += struct.pack(f"<{seg_len}i", *q_res)
+
+            buf += RESIDUAL_BLOCK_HEADER_STRUCT.pack(
+                seg_id,
+                seg_len,
+                byte_len,
+            )
+
+            if seg_len:
+                buf += struct.pack(
+                    f"<{seg_len}i",
+                    *q_res,
+                )
         else:
-            data_bytes = encode_int_list_varint(q_res)
-            byte_len = len(data_bytes)
-            buf += RESIDUAL_BLOCK_HEADER_STRUCT.pack(seg_id, seg_len, byte_len)
-            buf += data_bytes
+            payload = encode_int_list_varint(q_res)
+
+            buf += RESIDUAL_BLOCK_HEADER_STRUCT.pack(
+                seg_id,
+                seg_len,
+                len(payload),
+            )
+
+            buf += payload
 
     return bytes(buf)
 
@@ -907,91 +989,6 @@ def decode_timeseries(data: bytes) -> TimeSeries:
 _decode_timeseries_v1 = decode_timeseries
 
 
-def _extract_v1_model_for_v2(data: bytes):
-    """Extract V1 header/context/segment metadata for V2 serialization."""
-    if len(data) < FILE_HEADER_STRUCT.size:
-        raise ValueError("Data too short to contain header")
-
-    (
-        magic,
-        version,
-        flags,
-        header_len,
-        n_points,
-        n_segments,
-        reserved1,
-        reserved2,
-    ) = FILE_HEADER_STRUCT.unpack_from(data, 0)
-
-    if magic != b"LSG2":
-        raise ValueError("Invalid magic, not an LSG2 file")
-
-    if version != FORMAT_VERSION_V1:
-        raise ValueError(
-            f"Expected internal V1 reference stream, got version {version}"
-        )
-
-    offset = FILE_HEADER_STRUCT.size
-    context_end = offset + header_len
-
-    if context_end > len(data):
-        raise ValueError("Truncated LSG2 context")
-
-    context_bytes = data[offset:context_end]
-    offset = context_end
-
-    segments: list[SegmentEntry] = []
-
-    for _ in range(n_segments):
-        segment_end = offset + SEGMENT_ENTRY_STRUCT.size
-
-        if segment_end > len(data):
-            raise ValueError("Truncated V1 segment table")
-
-        (
-            start_idx,
-            end_idx,
-            predictor_type,
-            _pad1,
-            _pad2,
-            _pad3,
-            mean,
-            slope,
-            intercept,
-            quant_step_Q,
-            seed_value,
-        ) = SEGMENT_ENTRY_STRUCT.unpack_from(data, offset)
-
-        offset = segment_end
-
-        segments.append(
-            SegmentEntry(
-                start_idx=start_idx,
-                end_idx=end_idx,
-                predictor_type=predictor_type,
-                mean=mean,
-                slope=slope,
-                intercept=intercept,
-                quant_step_Q=quant_step_Q,
-                seed_value=seed_value,
-            )
-        )
-
-    return (
-        (
-            magic,
-            flags,
-            header_len,
-            n_points,
-            n_segments,
-            reserved1,
-            reserved2,
-        ),
-        context_bytes,
-        segments,
-    )
-
-
 def _round_segment_entry_v2(seg: SegmentEntry) -> SegmentEntry:
     """Round all V2 real metadata through the frozen binary32 wire layout."""
     try:
@@ -1072,13 +1069,18 @@ def encode_timeseries_v2(
     Encode a TimeSeries using the frozen Version 2 L32 segment layout.
 
     Segmentation, statistics and predictor selection are obtained from the
-    unchanged V1 encoder. Segment metadata is then rounded exactly through
-    the frozen <IIIfffff> representation before residuals are recomputed.
+    shared format-independent encoding model. Segment metadata is then rounded
+    exactly through the frozen <IIIfffff> representation before residuals are
+    recomputed.
 
     Random-walk encoding preserves the frozen semantic rule: samples after
     the seed are predicted from the previous ORIGINAL sample.
     """
-    v1_reference = encode_timeseries_v1(
+    (
+        context_bytes,
+        model_segments,
+        _,
+    ) = _build_encoding_model(
         ts,
         segment_length=segment_length,
         predictor=predictor,
@@ -1088,35 +1090,15 @@ def encode_timeseries_v2(
         min_segment_length=min_segment_length,
         max_segment_length=max_segment_length,
         mse_threshold=mse_threshold,
-        residual_coding=residual_coding,
     )
 
-    (
-        header,
-        context_bytes,
-        v1_segments,
-    ) = _extract_v1_model_for_v2(
-        v1_reference
-    )
-
-    (
-        magic,
-        flags,
-        header_len,
-        n_points,
-        n_segments,
-        reserved1,
-        reserved2,
-    ) = header
-
-    if n_points != len(ts.values):
-        raise ValueError(
-            "Internal V1 model point count does not match TimeSeries"
-        )
+    n_points = len(ts.values)
+    n_segments = len(model_segments)
+    header_len = len(context_bytes)
 
     v2_segments = [
         _round_segment_entry_v2(seg)
-        for seg in v1_segments
+        for seg in model_segments
     ]
 
     q_resid_segments: list[list[int]] = []
@@ -1173,14 +1155,14 @@ def encode_timeseries_v2(
     buf = bytearray()
 
     buf += FILE_HEADER_STRUCT.pack(
-        magic,
+        b"LSG2",
         FORMAT_VERSION_V2,
-        flags,
+        0,
         header_len,
         n_points,
         n_segments,
-        reserved1,
-        reserved2,
+        0,
+        0,
     )
 
     buf += context_bytes
