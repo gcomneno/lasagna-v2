@@ -153,6 +153,7 @@ data/tmp/*
 
 # CSV e LSG2 in root: ignorati (niente dataset/artefatti in top-level)
 *.csv
+!docs/external-codec-benchmark.csv
 *.lsg2
 
 # Ma CONSENTI gli esempi espliciti (synthetic, documentativi)
