@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import struct
 from argparse import Namespace
 
 import pytest

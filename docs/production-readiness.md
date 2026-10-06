@@ -319,8 +319,23 @@ header/segment/block corruption fuzzing
 Current status:
 
 ```text
-REQUIRED
+PASS
 ```
+
+Evidence:
+
+```text
+tools/fuzz_qualification.py
+tests/fuzz_corpus/
+tests/test_fuzz_qualification.py
+docs/fuzzing-qualification.md
+docs/fuzzing-qualification-results.json
+```
+
+The frozen qualification campaign exercises V1/V2 public decoding,
+structured wire mutations, direct varint decoding and direct zero-run
+decoding with deterministic replay semantics and zero unresolved
+unexpected crashes.
 
 ## Gate 6 — corruption behavior
 
@@ -871,7 +886,7 @@ Current known non-PASS mandatory gates include:
 format stability             PARTIAL
 compatibility policy         PARTIAL
 malformed-input handling     PARTIAL
-fuzzing                      REQUIRED
+fuzzing                      PASS
 corruption behavior          PARTIAL
 large-file behavior          REQUIRED
 release/versioning policy    PARTIAL
@@ -996,7 +1011,7 @@ Affected gates require requalification.
 02 compatibility policy         PARTIAL
 03 malformed-input handling     PARTIAL
 04 resource limits              PASS
-05 fuzzing                      REQUIRED
+05 fuzzing                      PASS
 06 corruption behavior          PARTIAL
 07 performance characterization PASS
 08 large-file behavior          REQUIRED
@@ -1017,7 +1032,7 @@ Affected gates require requalification.
 Current mandatory PASS count:
 
 ```text
-3
+4
 ```
 
 This count is informational only.

@@ -1,0 +1,36 @@
+{
+  "corpus_files": [
+    "v1-raw.lsg2",
+    "v1-varint.lsg2",
+    "v2-raw.lsg2",
+    "v2-varint.lsg2",
+    "v2-zero-run.lsg2"
+  ],
+  "crash_directory": "artifacts/fuzz-crashes",
+  "elapsed_seconds": 6.509478,
+  "iterations_per_target": 25000,
+  "schema_version": 1,
+  "seed": 20261006,
+  "targets": {
+    "decoder": {
+      "accepted": 10767,
+      "cases": 25000,
+      "crashes": 0,
+      "rejected": 14233
+    },
+    "residual-varint": {
+      "accepted": 6251,
+      "cases": 25000,
+      "crashes": 0,
+      "rejected": 18749
+    },
+    "residual-zero-run": {
+      "accepted": 151,
+      "cases": 25000,
+      "crashes": 0,
+      "rejected": 24849
+    }
+  },
+  "total_cases": 75000,
+  "total_crashes": 0
+}
