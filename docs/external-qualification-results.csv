@@ -1,0 +1,41 @@
+dataset,codec,comparison_class,implementation,implementation_version,configuration,n_samples,raw_bytes,encoded_bytes,bits_per_sample,compression_ratio,rmse,max_abs_error,encode_time_ms,decode_time_ms
+appliances-energy.csv,raw,lossless,python-struct,3.12.3,float64_le,19735,157880,157880,64.000000000,1.000000000,0,0,0.349939000,0.644812000
+appliances-energy.csv,gzip,lossless,python-gzip,1.3,level_9_mtime_0,19735,157880,14745,5.977197872,10.707358427,0,0,35.969237000,0.777126000
+appliances-energy.csv,zstd,lossless,zstd-cli,"*** Zstandard CLI (64-bit) v1.5.5, by Yann Collet ***",cli_default,19735,157880,21164,8.579275399,7.459837460,0,0,2.945683000,2.453634000
+appliances-energy.csv,gorilla,lossless,gorillacompression,1.0.2,values_only_f64_canonical_frame,19735,157880,26799,10.863541931,5.891264599,0,0,23.976400000,172.186869000
+appliances-energy.csv,lasagna,lossy,lasagna-v2,0.3.0,adaptive_auto_varint,19735,157880,46997,19.051228781,3.359363364,10.2364019199,63.4364929199,77.510583000,11.674164000
+metro-traffic.csv,raw,lossless,python-struct,3.12.3,float64_le,48204,385632,385632,64.000000000,1.000000000,0,0,0.887330000,1.611122000
+metro-traffic.csv,gzip,lossless,python-gzip,1.3,level_9_mtime_0,48204,385632,102749,17.052360800,3.753146016,0,0,274.757188000,2.324520000
+metro-traffic.csv,zstd,lossless,zstd-cli,"*** Zstandard CLI (64-bit) v1.5.5, by Yann Collet ***",cli_default,48204,385632,99896,16.578873123,3.860334748,0,0,5.217662000,4.071385000
+metro-traffic.csv,gorilla,lossless,gorillacompression,1.0.2,values_only_f64_canonical_frame,48204,385632,90106,14.954111692,4.279759394,0,0,73.924559000,1171.957119000
+metro-traffic.csv,lasagna,lossy,lasagna-v2,0.3.0,adaptive_auto_varint,48204,385632,114626,19.023483528,3.364262907,224.401842859,829.730163574,189.933704000,28.813941000
+beijing-pm25.csv,raw,lossless,python-struct,3.12.3,float64_le,34139,273112,273112,64.000000000,1.000000000,0,0,0.625885000,0.785524000
+beijing-pm25.csv,gzip,lossless,python-gzip,1.3,level_9_mtime_0,34139,273112,47214,11.063944462,5.784555428,0,0,153.788097000,1.451222000
+beijing-pm25.csv,zstd,lossless,zstd-cli,"*** Zstandard CLI (64-bit) v1.5.5, by Yann Collet ***",cli_default,34139,273112,57649,13.509241630,4.737497615,0,0,3.861839000,3.297213000
+beijing-pm25.csv,gorilla,lossless,gorillacompression,1.0.2,values_only_f64_canonical_frame,34139,273112,109173,25.583174668,2.501644179,0,0,48.688524000,1317.143993000
+beijing-pm25.csv,lasagna,lossy,lasagna-v2,0.3.0,adaptive_auto_varint,34139,273112,81201,19.028325376,3.363406855,4.68227093084,63.3749084473,133.219007000,20.479860000
+seoul-bike-demand.csv,raw,lossless,python-struct,3.12.3,float64_le,8760,70080,70080,64.000000000,1.000000000,0,0,0.131227000,0.186911000
+seoul-bike-demand.csv,gzip,lossless,python-gzip,1.3,level_9_mtime_0,8760,70080,17986,16.425570776,3.896363839,0,0,40.946610000,0.377757000
+seoul-bike-demand.csv,zstd,lossless,zstd-cli,"*** Zstandard CLI (64-bit) v1.5.5, by Yann Collet ***",cli_default,8760,70080,18451,16.850228311,3.798168121,0,0,2.546311000,1.784932000
+seoul-bike-demand.csv,gorilla,lossless,gorillacompression,1.0.2,values_only_f64_canonical_frame,8760,70080,16857,15.394520548,4.157323367,0,0,14.128222000,70.377445000
+seoul-bike-demand.csv,lasagna,lossy,lasagna-v2,0.3.0,adaptive_auto_varint,8760,70080,20930,19.114155251,3.348303870,62.2773548717,235.591522217,33.970052000,5.086912000
+fan-vibration-x.csv,raw,lossless,python-struct,3.12.3,float64_le,153000,1224000,1224000,64.000000000,1.000000000,0,0,4.407644000,6.128334000
+fan-vibration-x.csv,gzip,lossless,python-gzip,1.3,level_9_mtime_0,153000,1224000,225047,11.767163399,5.438863882,0,0,120.314110000,8.342895000
+fan-vibration-x.csv,zstd,lossless,zstd-cli,"*** Zstandard CLI (64-bit) v1.5.5, by Yann Collet ***",cli_default,153000,1224000,239355,12.515294118,5.113743185,0,0,10.329720000,11.269645000
+fan-vibration-x.csv,gorilla,lossless,gorillacompression,1.0.2,values_only_f64_canonical_frame,153000,1224000,1198689,62.676549020,1.021115569,0,0,219.766638000,59851.701120000
+fan-vibration-x.csv,lasagna,lossy,lasagna-v2,0.3.0,adaptive_auto_varint,153000,1224000,238914,12.492235294,5.123182400,0.105161964514,0.830831133127,3544.059930000,78.641693000
+dow-jones-weekly-return.csv,raw,lossless,python-struct,3.12.3,float64_le,25,200,200,64.000000000,1.000000000,0,0,0.000931000,0.001249000
+dow-jones-weekly-return.csv,gzip,lossless,python-gzip,1.3,level_9_mtime_0,25,200,223,71.360000000,0.896860987,0,0,0.016150000,0.004066000
+dow-jones-weekly-return.csv,zstd,lossless,zstd-cli,"*** Zstandard CLI (64-bit) v1.5.5, by Yann Collet ***",cli_default,25,200,213,68.160000000,0.938967136,0,0,1.778197000,1.223829000
+dow-jones-weekly-return.csv,gorilla,lossless,gorillacompression,1.0.2,values_only_f64_canonical_frame,25,200,230,73.600000000,0.869565217,0,0,0.045420000,0.060811000
+dow-jones-weekly-return.csv,lasagna,lossy,lasagna-v2,0.3.0,adaptive_auto_varint,25,200,183,58.560000000,1.092896175,0.497013563793,0.797276387691,0.139438000,0.034370000
+room-occupancy-count.csv,raw,lossless,python-struct,3.12.3,float64_le,10129,81032,81032,64.000000000,1.000000000,0,0,0.153939000,0.222673000
+room-occupancy-count.csv,gzip,lossless,python-gzip,1.3,level_9_mtime_0,10129,81032,198,0.156382664,409.252525253,0,0,0.484963000,0.356843000
+room-occupancy-count.csv,zstd,lossless,zstd-cli,"*** Zstandard CLI (64-bit) v1.5.5, by Yann Collet ***",cli_default,10129,81032,206,0.162701155,393.359223301,0,0,1.916992000,1.751953000
+room-occupancy-count.csv,gorilla,lossless,gorillacompression,1.0.2,values_only_f64_canonical_frame,10129,81032,1334,1.053608451,60.743628186,0,0,6.854504000,6.913890000
+room-occupancy-count.csv,lasagna,lossy,lasagna-v2,0.3.0,adaptive_auto_varint,10129,81032,13763,10.870174746,5.887669839,0.00506892158875,0.0905025005341,301.881864000,4.539609000
+tetouan-zone1-power.csv,raw,lossless,python-struct,3.12.3,float64_le,52416,419328,419328,64.000000000,1.000000000,0,0,0.849703000,1.115295000
+tetouan-zone1-power.csv,gzip,lossless,python-gzip,1.3,level_9_mtime_0,52416,419328,176165,26.887210012,2.380313910,0,0,16.733515000,2.788371000
+tetouan-zone1-power.csv,zstd,lossless,zstd-cli,"*** Zstandard CLI (64-bit) v1.5.5, by Yann Collet ***",cli_default,52416,419328,178929,27.309065934,2.343544087,0,0,13.543538000,9.425451000
+tetouan-zone1-power.csv,gorilla,lossless,gorillacompression,1.0.2,values_only_f64_canonical_frame,52416,419328,364191,55.584706960,1.151395834,0,0,131.896507000,7312.997329000
+tetouan-zone1-power.csv,lasagna,lossy,lasagna-v2,0.3.0,adaptive_auto_varint,52416,419328,124602,19.017399267,3.365339240,197.04610388,1164.58869913,228.007089000,36.247774000

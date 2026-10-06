@@ -200,3 +200,4 @@ temp/
 !data/external-qualification/selection.tsv
 !data/external-qualification/acquisition.tsv
 !data/external-qualification/canonical-manifest.tsv
+!docs/external-qualification-results.csv

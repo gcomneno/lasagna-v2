@@ -719,29 +719,41 @@ known limitations
 Current evidence:
 
 ```text
-docs/real-world-validation-protocol.md
-docs/real-world-validation.md
-docs/real-world-validation.csv
+docs/external-qualification-protocol.md
+docs/external-qualification.md
+docs/external-qualification-results.csv
+data/external-qualification/selection.tsv
+data/external-qualification/acquisition.tsv
+data/external-qualification/canonical-manifest.tsv
+tools/prepare_external_qualification.py
+tools/benchmark_external_qualification.py
+tests/test_external_qualification_protocol.py
+tests/test_external_qualification_results.py
 ```
 
-Current corpus:
+Qualified corpus:
 
 ```text
-3 externally sourced univariate series
-3 domains
+8 externally sourced univariate series
+8 independently identified source datasets
+8 declared domains / signal regimes
 ```
 
 Current status:
 
 ```text
-PARTIAL
+PASS
 ```
 
-The existing study demonstrates real-world validation capability but is too
-small to justify a broad production-readiness claim by itself.
+Dataset selection was frozen before measurement and canonical inputs were
+separately frozen before codec execution.
 
-Production qualification SHALL define a larger target corpus before this gate
-may become `PASS`.
+The qualification records source provenance, licensing, archive/member hashes,
+deterministic preprocessing, canonical hashes, compression metrics,
+reconstruction metrics and unfavorable results.
+
+The expanded corpus does not establish universal codec superiority and is not
+claimed to represent every possible time-series workload.
 
 ## Gate 14 — regression and CI reliability
 
@@ -1100,7 +1112,7 @@ Affected gates require requalification.
 10 security review              PASS
 11 API stability                PASS
 12 documentation completeness   PARTIAL
-13 external dataset validation  PARTIAL
+13 external dataset validation  PASS
 14 regression/CI reliability    PARTIAL
 15 deterministic behavior       PASS
 16 dependency policy            PARTIAL
@@ -1113,7 +1125,7 @@ Affected gates require requalification.
 Current mandatory PASS count:
 
 ```text
-12
+13
 ```
 
 This count is informational only.
