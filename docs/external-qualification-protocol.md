@@ -567,3 +567,63 @@ FROZEN_CONFIGURATION_GATE=PASS
 
 NEW_DATASET_CODEC_EXECUTION_GATE=BLOCKED_UNTIL_SOURCE_MANIFEST_FREEZE
 ```
+
+## Acquisition revision 1 — source cardinality correction
+
+Anchor before acquisition:
+
+```text
+291cd56450b3037be1a10b81b672fff2a9c19a7c
+```
+
+This revision was made after source acquisition/reconnaissance and before any
+Lasagna measurement on Q04-Q08.
+
+Observed source facts require two manifest corrections:
+
+```text
+Q06 Dow Jones Index:
+    source data rows = 750
+    selected AA rows = 25
+    missing selected values = 0
+
+Q08 Tetouan City Power Consumption:
+    source data rows = 52416
+```
+
+The original Q08 target of `52417 rows` reflected the published observation
+count/header-inclusive file-line expectation rather than the actual number of
+CSV data rows.
+
+The downloaded member contains:
+
+```text
+52417 text lines
+= 1 header
++ 52416 data rows
+```
+
+Therefore the deterministic preprocessing contract uses:
+
+```text
+expected source rows = 52416
+expected canonical samples = 52416
+```
+
+No dataset was added, removed, replaced or selected based on codec results.
+
+No codec result had been produced when this revision was made.
+
+Revision classification:
+
+```text
+ACQUISITION_FACT_CORRECTION
+```
+
+Selection remains:
+
+```text
+Q01-Q08 unchanged
+8 datasets
+8 declared domains
+```
