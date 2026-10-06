@@ -579,9 +579,7 @@ Mandatory:
 YES
 ```
 
-Required stable public API surface SHALL be explicitly listed.
-
-Current likely public surface includes:
+Stable public Python surface:
 
 ```text
 TimeSeries
@@ -603,14 +601,35 @@ deprecation process
 CLI compatibility policy
 ```
 
+Current evidence:
+
+```text
+docs/public-api-contract.md
+lasagna2/__init__.py
+tests/test_public_api_contract.py
+tests/test_cli_v2_acceptance.py
+tests/test_cli_encode_decode_info.py
+```
+
 Current status:
 
 ```text
-REQUIRED
+PASS
 ```
 
-Existing behavior is documented, but a formal stable-API contract has not yet
-been frozen.
+The supported Python surface now exactly matches the package export contract.
+
+Function signatures, defaults, return types, exception categories, CLI
+commands/options/defaults and explicitly private/internal symbols are
+documented.
+
+Breaking Python or CLI changes require a documented deprecation phase with the
+old behavior retained through at least one published package release before
+removal, except for explicitly documented security, integrity, data-loss or
+critical-correctness emergencies.
+
+Wire-version lifetime and future wire migration policy remain separate work
+under the release/versioning gate.
 
 ## Gate 12 — documentation completeness
 
@@ -930,7 +949,7 @@ corruption behavior          PASS
 large-file behavior          PASS
 release/versioning policy    PARTIAL
 security review              PASS
-API stability                REQUIRED
+API stability                PASS
 documentation completeness   PARTIAL
 external dataset validation  PARTIAL
 CI/runtime support policy    PARTIAL
@@ -1056,7 +1075,7 @@ Affected gates require requalification.
 08 large-file behavior          PASS
 09 release/versioning policy    PARTIAL
 10 security review              PASS
-11 API stability                REQUIRED
+11 API stability                PASS
 12 documentation completeness   PARTIAL
 13 external dataset validation  PARTIAL
 14 regression/CI reliability    PARTIAL
@@ -1071,7 +1090,7 @@ Affected gates require requalification.
 Current mandatory PASS count:
 
 ```text
-8
+9
 ```
 
 This count is informational only.
