@@ -1,0 +1,125 @@
+{
+  "adjacent_scaling": [
+    {
+      "decode_rss_ratio": 2.006251260334745,
+      "decode_time_ratio": 13.025725805919315,
+      "encode_rss_ratio": 1.5543664383561644,
+      "encode_time_ratio": 10.5602525793246,
+      "from_points": 10000,
+      "point_ratio": 10.0,
+      "to_points": 100000
+    },
+    {
+      "decode_rss_ratio": 6.989546688109358,
+      "decode_time_ratio": 15.159847098955183,
+      "encode_rss_ratio": 5.497521343982374,
+      "encode_time_ratio": 11.507324775603578,
+      "from_points": 100000,
+      "point_ratio": 10.0,
+      "to_points": 1000000
+    },
+    {
+      "decode_rss_ratio": 1.9925653230561269,
+      "decode_time_ratio": 1.6288479477158848,
+      "encode_rss_ratio": 2.005585752573704,
+      "encode_time_ratio": 1.8223020542162018,
+      "from_points": 1000000,
+      "point_ratio": 2.0,
+      "to_points": 2000000
+    }
+  ],
+  "boundary_checks": [
+    {
+      "name": "max-points-exact",
+      "status": "PASS"
+    },
+    {
+      "exception": "n_points=10000001 exceeds maximum 10000000",
+      "name": "max-points-plus-one",
+      "status": "PASS"
+    },
+    {
+      "name": "max-segments-exact",
+      "status": "PASS"
+    },
+    {
+      "exception": "n_segments=1000001 exceeds maximum 1000000",
+      "name": "max-segments-plus-one",
+      "status": "PASS"
+    },
+    {
+      "name": "max-input-bytes-exact",
+      "status": "PASS"
+    },
+    {
+      "exception": "Encoded LSG2 output exceeds maximum size 176065580 bytes",
+      "name": "max-input-bytes-plus-one",
+      "status": "PASS"
+    },
+    {
+      "derived_max_input_bytes": 176065580,
+      "name": "offset-arithmetic-within-uint32",
+      "status": "PASS",
+      "uint32_max": 4294967295
+    }
+  ],
+  "dense_segment_case": {
+    "build_seconds": 0.06175296600031288,
+    "decode_seconds": 0.5843630629997278,
+    "encoded_bytes": 4800110,
+    "n_points": 100000,
+    "n_segments": 100000,
+    "peak_rss_kib": 86136
+  },
+  "environment": {
+    "logical_cpu_count": 4,
+    "machine": "x86_64",
+    "platform": "Linux-6.8.0-146-generic-x86_64-with-glibc2.39",
+    "python_version": "3.12.3"
+  },
+  "limits": {
+    "MAX_INPUT_BYTES": 176065580,
+    "MAX_POINTS": 10000000,
+    "MAX_SEGMENTS": 1000000,
+    "UINT32_MAX": 4294967295
+  },
+  "schema_version": 1,
+  "v2_trend_scaling": [
+    {
+      "decode_ms": 4.848128,
+      "decode_peak_rss_kib": 19836,
+      "encode_ms": 256.745797,
+      "encode_peak_rss_kib": 18688,
+      "encoded_bytes": 13590,
+      "n_points": 10000,
+      "n_segments": 79
+    },
+    {
+      "decode_ms": 63.150386,
+      "decode_peak_rss_kib": 39796,
+      "encode_ms": 2711.300465,
+      "encode_peak_rss_kib": 29048,
+      "encoded_bytes": 134522,
+      "n_points": 100000,
+      "n_segments": 782
+    },
+    {
+      "decode_ms": 957.350196,
+      "decode_peak_rss_kib": 278156,
+      "encode_ms": 31199.815015,
+      "encode_peak_rss_kib": 159692,
+      "encoded_bytes": 1672014,
+      "n_points": 1000000,
+      "n_segments": 7813
+    },
+    {
+      "decode_ms": 1559.377902,
+      "decode_peak_rss_kib": 554244,
+      "encode_ms": 56855.486993,
+      "encode_peak_rss_kib": 320276,
+      "encoded_bytes": 3793918,
+      "n_points": 2000000,
+      "n_segments": 15625
+    }
+  ]
+}

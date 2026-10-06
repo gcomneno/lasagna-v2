@@ -1,0 +1,2 @@
+codec,signal,n_samples,segment_count,encoded_bytes,encode_median_ms,decode_median_ms,encode_samples_per_second,decode_samples_per_second,encode_raw_mib_per_second,decode_raw_mib_per_second,encode_traced_peak_bytes,decode_traced_peak_bytes,encode_peak_rss_kib,decode_peak_rss_kib
+v2,trend,2000000,15625,3793918,56855.486993,1559.377902,35176.90386235261,1282562.7434086853,0.26837847795374,9.78517718054722,87225094,126687927,320276,554244

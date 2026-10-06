@@ -1,0 +1,12 @@
+scenario	codec	n_points	n_segments	purpose
+existing-scale-v2-trend-10k	v2	10000	derived	runtime/RSS baseline
+existing-scale-v2-trend-100k	v2	100000	derived	runtime/RSS scaling
+existing-scale-v2-trend-1m	v2	1000000	derived	runtime/RSS scaling
+pilot-scale-v2-trend-2m	v2	2000000	derived	large n_points + runtime/RSS upper qualification
+synthetic-v2-100k-segments	v2	100000	100000	large segment table + residual headers + decode offsets
+header-max-points	v1/v2	10000000	n/a	exact configured point limit
+header-max-points-plus-one	v1/v2	10000001	n/a	reject configured point limit + 1
+header-max-segments	v1/v2	n/a	1000000	exact configured segment limit
+header-max-segments-plus-one	v1/v2	n/a	1000001	reject configured segment limit + 1
+uint32-segment-end	v1	UINT32_MAX	n/a	reject impossible segment endpoint before allocation
+input-size-boundary	v1/v2	n/a	n/a	validate exact MAX_INPUT_BYTES and reject +1

@@ -443,8 +443,27 @@ tests.
 Current status:
 
 ```text
-REQUIRED
+PASS
 ```
+
+Evidence:
+
+```text
+docs/large-file-qualification.md
+docs/large-file-qualification-matrix.tsv
+docs/large-file-qualification-pilot.csv
+docs/large-file-qualification-results.json
+tools/qualify_large_file.py
+tests/test_large_file_qualification.py
+tests/test_resource_limits.py
+```
+
+Qualification includes empirical V2 scaling through 2,000,000 points,
+a valid 100,000-segment V2 stream, isolated peak-RSS evidence,
+configured-limit boundary checks and integer/offset safety checks.
+
+The configured 10,000,000-point and 1,000,000-segment ceilings remain
+resource-policy limits, not implied practical-performance guarantees.
 
 Existing performance characterization is useful evidence but does not by itself
 establish production large-file limits and failure behavior.
@@ -888,7 +907,7 @@ compatibility policy         PARTIAL
 malformed-input handling     PARTIAL
 fuzzing                      PASS
 corruption behavior          PARTIAL
-large-file behavior          REQUIRED
+large-file behavior          PASS
 release/versioning policy    PARTIAL
 security review              REQUIRED
 API stability                REQUIRED
@@ -1014,7 +1033,7 @@ Affected gates require requalification.
 05 fuzzing                      PASS
 06 corruption behavior          PARTIAL
 07 performance characterization PASS
-08 large-file behavior          REQUIRED
+08 large-file behavior          PASS
 09 release/versioning policy    PARTIAL
 10 security review              REQUIRED
 11 API stability                REQUIRED
@@ -1032,7 +1051,7 @@ Affected gates require requalification.
 Current mandatory PASS count:
 
 ```text
-4
+5
 ```
 
 This count is informational only.
