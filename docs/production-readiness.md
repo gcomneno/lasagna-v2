@@ -139,6 +139,7 @@ Current evidence:
 ```text
 docs/rate-distortion-design.md
 docs/v2-empirical-validation.md
+docs/release-versioning-policy.md
 tests/test_core_v2_format.py
 tests/test_core_v2_wire.py
 tests/test_v1_frozen_compatibility.py
@@ -147,14 +148,17 @@ tests/test_v1_frozen_compatibility.py
 Current status:
 
 ```text
-PARTIAL
+PASS
 ```
 
-Rationale:
+V1 remains the immutable historical compatibility baseline and V2 remains the
+frozen L32 physical format.
 
-V2 physical representation and compatibility behavior are frozen and tested,
-but production readiness additionally requires a durable versioning and
-deprecation policy covering future format evolution.
+Field semantics, field widths, little-endian representation, reserved-field
+policy and unknown-version fail-closed behavior are documented.
+
+The durable release policy now requires any incompatible physical or semantic
+change to use a new wire-format version rather than reinterpret V1 or V2.
 
 ## Gate 2 — compatibility policy
 
@@ -179,31 +183,36 @@ Current evidence:
 
 ```text
 README.md
+docs/public-api-contract.md
+docs/release-versioning-policy.md
 tests/test_v1_frozen_compatibility.py
 tests/test_core_v2_wire.py
+tests/test_release_versioning_policy.py
 ```
 
 Current status:
 
 ```text
-PARTIAL
+PASS
 ```
 
-Known:
+Current compatibility declaration:
 
 ```text
-V1 decode retained
-V2 default encode
-unknown versions fail closed
+decode: V1, V2
+default encode: V2
+explicit encode: V1, V2
+deprecated wire versions: none
 ```
 
-Still required:
+A newer default does not remove older decode support.
 
-```text
-formal deprecation policy
-support-lifetime policy
-migration policy for future V3+
-```
+Removing decode support requires a production-qualified successor, a published
+deprecation release retaining the old decoder, a documented reproducible
+migration path and a later package release explicitly classified as
+incompatible.
+
+Unsupported future wire versions continue to fail closed.
 
 ## Gate 3 — malformed-input handling
 
@@ -501,15 +510,29 @@ Current evidence:
 
 ```text
 pyproject.toml
-existing release/tag history
+RELEASE_NOTES.md
+docs/public-api-contract.md
+docs/release-versioning-policy.md
+existing immutable release/tag history
 V1/V2 wire documentation
+tests/test_release_versioning_policy.py
 ```
 
 Current status:
 
 ```text
-PARTIAL
+PASS
 ```
+
+Package Semantic Versioning and LSG2 wire versions are explicitly independent
+domains.
+
+Published release tags are immutable, `RELEASE_NOTES.md` is the canonical
+human-readable release history, release compatibility declarations are
+required, and security-fix release behavior is defined.
+
+The repository currently has no automated package-publishing workflow; the
+policy does not claim automated provenance that does not exist.
 
 ## Gate 10 — security review
 
@@ -941,13 +964,13 @@ The documentation MUST continue to state that scope explicitly.
 Current known non-PASS mandatory gates include:
 
 ```text
-format stability             PARTIAL
-compatibility policy         PARTIAL
+format stability             PASS
+compatibility policy         PASS
 malformed-input handling     PASS
 fuzzing                      PASS
 corruption behavior          PASS
 large-file behavior          PASS
-release/versioning policy    PARTIAL
+release/versioning policy    PASS
 security review              PASS
 API stability                PASS
 documentation completeness   PARTIAL
@@ -1065,15 +1088,15 @@ Affected gates require requalification.
 ## Production-readiness matrix
 
 ```text
-01 format stability             PARTIAL
-02 compatibility policy         PARTIAL
+01 format stability             PASS
+02 compatibility policy         PASS
 03 malformed-input handling     PASS
 04 resource limits              PASS
 05 fuzzing                      PASS
 06 corruption behavior          PASS
 07 performance characterization PASS
 08 large-file behavior          PASS
-09 release/versioning policy    PARTIAL
+09 release/versioning policy    PASS
 10 security review              PASS
 11 API stability                PASS
 12 documentation completeness   PARTIAL
@@ -1090,7 +1113,7 @@ Affected gates require requalification.
 Current mandatory PASS count:
 
 ```text
-9
+12
 ```
 
 This count is informational only.

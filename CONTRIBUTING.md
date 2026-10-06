@@ -160,3 +160,22 @@ If you are unsure whether your idea fits the project:
 Discussion early in the process usually saves time and leads to a better design.
 
 Thanks again for helping to improve **Lasagna v2**!
+
+---
+
+## Release and wire-version policy
+
+Project releases, LSG2 wire-version compatibility, tag immutability,
+wire-version deprecation and security-fix release behavior are governed by:
+
+```text
+docs/release-versioning-policy.md
+```
+
+Published release tags are immutable.
+
+A released LSG2 wire version must not be incompatibly reinterpreted under the
+same `format_version`.
+
+Compatibility-affecting release work must update `RELEASE_NOTES.md` and the
+release compatibility declaration described by the policy.
