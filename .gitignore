@@ -192,3 +192,9 @@ temp/
 !docs/performance-benchmark-environment.json
 !docs/predictor-candidate-results.csv
 !docs/predictor-candidate-winners.csv
+
+# External qualification metadata is reproducibility evidence.
+
+!data/external-qualification/
+
+!data/external-qualification/selection.tsv

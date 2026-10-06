@@ -1,0 +1,9 @@
+qualification_id	dataset_id	domain	source	doi	license	selected_entity	selected_field	expected_source_rows	canonical_file	status
+Q01	appliances-energy	building-appliance-energy	UCI	10.24432/C5VC8G	CC-BY-4.0	-	Appliances	19735	appliances-energy.csv	inherited
+Q02	metro-traffic	road-traffic-volume	UCI	10.24432/C5X60B	CC-BY-4.0	-	traffic_volume	48204	metro-traffic.csv	inherited
+Q03	beijing-pm25	urban-particulate-pollution	UCI	10.24432/C5RK5G	CC-BY-4.0	Aotizhongxin	PM2.5	35064	beijing-pm25.csv	inherited
+Q04	seoul-bike-demand	urban-bicycle-demand	UCI	10.24432/C5F62R	CC-BY-4.0	-	Rented Bike Count	8760	seoul-bike-demand.csv	frozen-new
+Q05	fan-vibration-x	mechanical-vibration	UCI	10.24432/C5Q61V	CC-BY-4.0	all	x	153000	fan-vibration-x.csv	frozen-new
+Q06	dow-jones-weekly-return	financial-market-returns	UCI	10.24432/C5788V	CC-BY-4.0	AA	percent_change_price	TBD	dow-jones-weekly-return.csv	frozen-new
+Q07	room-occupancy-count	room-occupancy	UCI	10.24432/C5P605	CC-BY-4.0	-	Room_Occupancy_Count	10129	room-occupancy-count.csv	frozen-new
+Q08	tetouan-zone1-power	electrical-distribution-load	UCI	10.24432/C5B034	CC-BY-4.0	Zone 1	Zone 1 Power Consumption	52417	tetouan-zone1-power.csv	frozen-new
