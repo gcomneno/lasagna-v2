@@ -17,7 +17,7 @@ seed = 20261006
 iterations per target = 25000
 total target executions = 75000
 unexpected crashes = 0
-elapsed seconds = 6.509478
+elapsed seconds = 5.948822
 ```
 
 Canonical result artifact:
@@ -72,6 +72,8 @@ point count
 segment count
 invalid UTF-8 context
 pathological context nesting
+malformed context root/sampling shape
+invalid context dt type/range conversion
 segment start/end
 predictor identifier
 residual coding identifier

@@ -290,6 +290,31 @@ def _validate_context_bytes(data: bytes) -> None:
     _validate_context_depth(data)
 
 
+def _parse_context_json(data: bytes) -> dict:
+    """Parse and validate the common LSG2 context shape."""
+    _validate_context_bytes(data)
+
+    try:
+        ctx = json.loads(data.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError("Invalid context JSON") from exc
+
+    if not isinstance(ctx, dict):
+        raise ValueError("Context JSON must be an object")
+
+    sampling = ctx.get("sampling", {})
+
+    if not isinstance(sampling, dict):
+        raise ValueError("Context sampling must be an object")
+
+    try:
+        float(sampling.get("dt", 1.0))
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError("Context sampling.dt must be float-convertible") from exc
+
+    return ctx
+
+
 def _validate_input_size(data: bytes) -> None:
     if len(data) > MAX_INPUT_BYTES:
         raise ValueError("LSG2 input exceeds maximum size " f"{MAX_INPUT_BYTES} bytes")
@@ -1300,7 +1325,7 @@ def decode_timeseries(data: bytes) -> TimeSeries:
     ctx_bytes = data[offset : offset + header_len]
     offset += header_len
 
-    ctx = json.loads(ctx_bytes.decode("utf-8"))
+    ctx = _parse_context_json(ctx_bytes)
     dt = float(ctx.get("sampling", {}).get("dt", 1.0))
     t0 = str(ctx.get("sampling", {}).get("t0", "1970-01-01T00:00:00Z"))
     unit = str(ctx.get("unit", "unknown"))

@@ -7,16 +7,16 @@
     "v2-zero-run.lsg2"
   ],
   "crash_directory": "artifacts/fuzz-crashes",
-  "elapsed_seconds": 6.509478,
+  "elapsed_seconds": 5.948822,
   "iterations_per_target": 25000,
   "schema_version": 1,
   "seed": 20261006,
   "targets": {
     "decoder": {
-      "accepted": 10767,
+      "accepted": 10754,
       "cases": 25000,
       "crashes": 0,
-      "rejected": 14233
+      "rejected": 14246
     },
     "residual-varint": {
       "accepted": 6251,

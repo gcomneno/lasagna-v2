@@ -19,13 +19,12 @@ from .core import (
     SEGMENT_ENTRY_V2_STRUCT,
     SegmentEntry,
     TimeSeries,
+    _parse_context_json,
     _preflight_lsg2,
     decode_timeseries,
     encode_timeseries_v1,
     encode_timeseries_v2,
 )
-
-import json
 
 
 def _read_lsg2_bounded(path: Path) -> bytes:
@@ -250,7 +249,7 @@ def read_lsg2_metadata_and_segments(
     ctx_bytes = data[offset : offset + header_len]
     offset += header_len
 
-    ctx = json.loads(ctx_bytes.decode("utf-8"))
+    ctx = _parse_context_json(ctx_bytes)
 
     # Segment table
     segments: List[SegmentEntry] = []

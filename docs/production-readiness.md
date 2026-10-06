@@ -233,18 +233,25 @@ Current evidence:
 tests/test_decode_malicious.py
 tests/test_core_v2_wire.py
 tests/test_residual_zero_run_codec.py
+tests/test_resource_limits.py
+tests/test_fuzz_qualification.py
+docs/fuzzing-qualification.md
+docs/security-review.md
 ```
 
 Current status:
 
 ```text
-PARTIAL
+PASS
 ```
 
-Reason:
+Targeted malformed-input regressions, explicit production resource preflight,
+structured V1/V2 mutation coverage and the canonical 75,000-case fuzz
+qualification now cover the required malformed-input classes.
 
-Targeted malformed-input tests exist, but systematic adversarial coverage is
-not yet demonstrated.
+Issue #16 additionally fixed malformed context shape/type cases that could
+previously escape as `AttributeError`, `TypeError` or `OverflowError`; they now
+fail consistently with `ValueError`.
 
 ## Gate 4 — resource limits
 
@@ -360,6 +367,7 @@ Current evidence:
 
 ```text
 tests/test_decode_malicious.py
+docs/security-review.md
 docs/access-architecture.md
 docs/multivariate-architecture.md
 ```
@@ -367,17 +375,17 @@ docs/multivariate-architecture.md
 Current status:
 
 ```text
-PARTIAL
+PASS
 ```
 
-Open production question:
+The production corruption contract now explicitly documents structural
+rejection, accepted file-level and ordinary-varint trailing-byte behavior,
+legacy V1 differential semantics, lack of intrinsic checksum/authentication,
+segment-local random-walk propagation, V1 overlap behavior and the boundary
+between whole-file production semantics and future partial decode.
 
-```text
-checksum / integrity-domain policy
-```
-
-A codec may be production-ready without checksums only if that limitation is
-explicitly accepted and documented.
+Checksum/integrity protection is not present and is explicitly accepted as a
+documented residual risk rather than represented as an existing guarantee.
 
 ## Gate 7 — performance characterization
 
@@ -535,9 +543,14 @@ resolved critical/high findings
 accepted residual risks
 ```
 
-Current CI evidence includes:
+Current evidence:
 
 ```text
+docs/security-review.md
+docs/resource-limits.md
+docs/fuzzing-qualification.md
+docs/fuzzing-qualification-results.json
+docs/large-file-qualification.md
 .github/workflows/security.yml
 .github/workflows/supply-chain.yml
 ```
@@ -545,11 +558,18 @@ Current CI evidence includes:
 Current status:
 
 ```text
-REQUIRED
+PASS
 ```
 
-Security workflows are useful but do not replace a codec/parser security
-review.
+The production parser/CLI review found no critical or high findings.
+
+The one required code finding, S01 malformed context shape/type exception
+leakage, is resolved with V1/V2 and CLI regressions plus structured fuzz
+coverage.
+
+All remaining findings are explicitly classified and either documented,
+accepted as compatibility/deployment residual risk, or retained as
+nonblocking hardening.
 
 ## Gate 11 — API stability
 
@@ -904,12 +924,12 @@ Current known non-PASS mandatory gates include:
 ```text
 format stability             PARTIAL
 compatibility policy         PARTIAL
-malformed-input handling     PARTIAL
+malformed-input handling     PASS
 fuzzing                      PASS
-corruption behavior          PARTIAL
+corruption behavior          PASS
 large-file behavior          PASS
 release/versioning policy    PARTIAL
-security review              REQUIRED
+security review              PASS
 API stability                REQUIRED
 documentation completeness   PARTIAL
 external dataset validation  PARTIAL
@@ -1028,14 +1048,14 @@ Affected gates require requalification.
 ```text
 01 format stability             PARTIAL
 02 compatibility policy         PARTIAL
-03 malformed-input handling     PARTIAL
+03 malformed-input handling     PASS
 04 resource limits              PASS
 05 fuzzing                      PASS
-06 corruption behavior          PARTIAL
+06 corruption behavior          PASS
 07 performance characterization PASS
 08 large-file behavior          PASS
 09 release/versioning policy    PARTIAL
-10 security review              REQUIRED
+10 security review              PASS
 11 API stability                REQUIRED
 12 documentation completeness   PARTIAL
 13 external dataset validation  PARTIAL
@@ -1051,7 +1071,7 @@ Affected gates require requalification.
 Current mandatory PASS count:
 
 ```text
-5
+8
 ```
 
 This count is informational only.

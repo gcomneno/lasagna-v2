@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+import pytest
+from lasagna2 import cli
+from lasagna2 import core
+
+
 from pathlib import Path
 from lasagna2.cli import main as lasagna_main
 
@@ -253,3 +258,43 @@ def test_export_profile_csv(tmp_path: Path):
     # su trend puro ci aspettiamo tutto "trend"
     frac_trend_idx = header.index("frac_trend")
     assert float(row[frac_trend_idx]) > 0.9
+
+
+@pytest.mark.parametrize(
+    "context",
+    [
+        b"[]",
+        b"null",
+        b'{"sampling":[]}',
+        b'{"sampling":{"dt":[]}}',
+        b'{"sampling":{"dt":null}}',
+        (b'{"sampling":{"dt":' + b"9" * 1000 + b"}}"),
+    ],
+)
+def test_metadata_reader_rejects_malformed_context_shape(
+    context: bytes,
+) -> None:
+    data = core.encode_timeseries_v2(
+        core.TimeSeries(
+            values=[1.0, 2.0, 3.0, 4.0],
+        ),
+        segment_length=4,
+        predictor="mean",
+        residual_coding="raw",
+    )
+
+    header = list(
+        core.FILE_HEADER_STRUCT.unpack_from(
+            data,
+            0,
+        )
+    )
+    old_context_len = int(header[3])
+    old_context_end = core.FILE_HEADER_STRUCT.size + old_context_len
+
+    header[3] = len(context)
+
+    malformed = core.FILE_HEADER_STRUCT.pack(*header) + context + data[old_context_end:]
+
+    with pytest.raises(ValueError):
+        cli.read_lsg2_metadata_and_segments(malformed)

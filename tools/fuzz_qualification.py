@@ -250,6 +250,44 @@ def structured_mutations(data: bytes) -> list[tuple[str, bytes]]:
         ).ljust(context_end - context_start, b" ")
         mutations.append(("context-deep-json", bytes(mutated)))
 
+        malformed_contexts = (
+            ("context-root-array", b"[]"),
+            ("context-root-null", b"null"),
+            ("context-sampling-array", b'{"sampling":[]}'),
+            ("context-dt-array", b'{"sampling":{"dt":[]}}'),
+            ("context-dt-null", b'{"sampling":{"dt":null}}'),
+            (
+                "context-dt-huge-integer",
+                b'{"sampling":{"dt":' + b"9" * 1000 + b"}}",
+            ),
+        )
+
+        for name, replacement in malformed_contexts:
+            header = list(
+                core.FILE_HEADER_STRUCT.unpack_from(
+                    data,
+                    0,
+                )
+            )
+
+            old_context_len = int(header[3])
+            old_context_end = core.FILE_HEADER_STRUCT.size + old_context_len
+
+            header[3] = len(replacement)
+
+            mutated = (
+                core.FILE_HEADER_STRUCT.pack(*header)
+                + replacement
+                + data[old_context_end:]
+            )
+
+            mutations.append(
+                (
+                    name,
+                    mutated,
+                )
+            )
+
     # Segment table mutations.
     if residual_offset >= segment_offset + segment_size:
         mutated = bytearray(data)
