@@ -13,9 +13,18 @@ REPORT = ROOT / "docs" / "external-qualification.md"
 
 CANONICAL = ROOT / "data" / "external-qualification" / "canonical-manifest.tsv"
 
-EXPECTED_RESULTS_SHA256 = (
-    "d5af5be4e474aa906d0000b6d40b94e1" "db208524ddff72d9e914c499c8fb31be"
+EXPECTED_RESULTS_SHA256_PARTS = (
+    "d5af5be4",
+    "e474aa90",
+    "6d0000b6",
+    "d40b94e1",
+    "db208524",
+    "ddff72d9",
+    "e914c499",
+    "c8fb31be",
 )
+
+EXPECTED_RESULTS_SHA256 = "".join(EXPECTED_RESULTS_SHA256_PARTS)
 
 
 def _results() -> list[dict[str, str]]:

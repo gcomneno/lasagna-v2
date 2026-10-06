@@ -678,23 +678,39 @@ resource limits
 performance expectations
 known non-goals
 migration guidance
+operational observability
 ```
 
 Current evidence:
 
 ```text
+docs/production-operations.md
 README.md
-docs/
+docs/public-api-contract.md
+docs/release-versioning-policy.md
+docs/resource-limits.md
+docs/security-review.md
+docs/performance-benchmark.md
+docs/large-file-qualification.md
+docs/external-qualification.md
+tests/test_production_operations_docs.py
 ```
 
 Current status:
 
 ```text
-PARTIAL
+PASS
 ```
 
-The repository has extensive research documentation but production operational
-documentation remains incomplete.
+`docs/production-operations.md` is the production-facing entry point.
+
+It separates operational guarantees from research evidence, links to the
+authoritative compatibility/security/resource/performance contracts, and makes
+unsupported or incompletely qualified capabilities explicit.
+
+This documentation gate does not promote other readiness gates. In particular,
+the complete numeric-domain contract and full operational-observability
+qualification retain their independently assessed statuses.
 
 ## Gate 13 — external dataset validation
 
@@ -985,7 +1001,7 @@ large-file behavior          PASS
 release/versioning policy    PASS
 security review              PASS
 API stability                PASS
-documentation completeness   PARTIAL
+documentation completeness   PASS
 external dataset validation  PARTIAL
 CI/runtime support policy    PARTIAL
 dependency policy            PARTIAL
@@ -1111,7 +1127,7 @@ Affected gates require requalification.
 09 release/versioning policy    PASS
 10 security review              PASS
 11 API stability                PASS
-12 documentation completeness   PARTIAL
+12 documentation completeness   PASS
 13 external dataset validation  PASS
 14 regression/CI reliability    PARTIAL
 15 deterministic behavior       PASS
@@ -1125,7 +1141,7 @@ Affected gates require requalification.
 Current mandatory PASS count:
 
 ```text
-13
+14
 ```
 
 This count is informational only.

@@ -23,6 +23,13 @@ compressors.
 > **Research status:** experimental, reproducible, and intentionally explicit
 > about its assumptions and limitations.
 
+For deployment-oriented guidance, start with
+[`docs/production-operations.md`](docs/production-operations.md). It collects
+the supported operational surface, failure/security boundaries, resource and
+performance expectations, migration guidance, and links to the authoritative
+contracts. Lasagna remains experimental until the production-readiness tracker
+passes every mandatory gate.
+
 ---
 
 ## Measured V2 result
@@ -444,8 +451,9 @@ The repository also contains GitHub Actions workflows for:
 - OpenSSF Scorecard;
 - hardened runners.
 
-The scientific validation cycle was closed with **42 passing tests** at the
-validated implementation state.
+The repository maintains automated codec, compatibility, security and
+documentation regression coverage. Current test counts are intentionally not
+hard-coded here; the test suite is the authoritative executable evidence.
 
 ---
 
@@ -456,11 +464,16 @@ Lasagna 2 is research software.
 Current boundaries include:
 
 - univariate time series only;
+- whole-file processing as the current baseline;
 - lossy reconstruction when quantization is active;
-- synthetic canonical validation corpus;
+- synthetic and externally sourced qualification corpora, without a claim that
+  they represent every workload;
 - no claim of universal compression superiority;
-- no stability guarantee for future protocol revisions;
-- not intended as a production archival format at this stage.
+- V1/V2 wire and public API/CLI compatibility governed by the published
+  stability/deprecation contracts;
+- incomplete production qualification for the full numeric domain and
+  operational observability;
+- not intended as a lossless production archival format.
 
 The V2 result should be interpreted as a controlled comparison against the
 project's V1 baseline, not as a benchmark over the full time-series compression
