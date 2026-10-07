@@ -63,11 +63,16 @@ def test_operations_guide_documents_qualified_numeric_domain() -> None:
     assert "Historical decoder compatibility" in text
 
 
-def test_operations_guide_keeps_experimental_boundary() -> None:
+def test_operations_guide_records_completed_production_boundary() -> None:
     text = OPERATIONS.read_text(encoding="utf-8").lower()
+    normalized = " ".join(text.split())
 
-    assert "continues to identify itself as experimental" in text
-    assert "does not by itself make lasagna production-ready" in text
+    assert (
+        "is production-qualified for the documented univariate whole-file" in normalized
+    )
+    assert "every mandatory gate" in normalized
+    assert "final aggregate audit" in normalized
+    assert "continues to identify itself as experimental" not in normalized
 
 
 def test_readme_points_to_operations_guide_and_has_no_stale_claims() -> None:
@@ -146,4 +151,18 @@ def test_readme_has_no_stale_gate_17_or_18_limitation() -> None:
     assert "operational observability;" not in text
     assert (
         "numeric-domain and operational-observability qualification completed" in text
+    )
+
+
+def test_final_production_readiness_decision_is_pass() -> None:
+    text = READINESS.read_text(encoding="utf-8")
+
+    assert "PROJECT STATUS = PRODUCTION-QUALIFIED" in text
+    assert "PRODUCTION READY = YES" in text
+    assert "PRODUCTION_READY_GATE=PASS" in text
+    assert "ISSUE_12_CLOSE_GATE=PASS" in text
+    assert "Issue #12 may close now:\n\n```text\nYES\n```" in text
+    assert (
+        "all mandatory gates are PASS; final aggregate audit completed with no blockers"
+        in text
     )

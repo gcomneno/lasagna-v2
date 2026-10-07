@@ -4,8 +4,9 @@ Issue: #20 — `docs: complete production operational documentation`
 
 ## Status and scope
 
-Lasagna 2 remains experimental until the parent production-readiness tracker
-(#12) passes every mandatory gate.
+Lasagna 2 is production-qualified for the documented univariate whole-file
+baseline. The parent production-readiness tracker (#12) records the
+qualification evidence and scope.
 
 This guide is the production-facing operational entry point for the currently
 supported codec surface. It summarizes how to operate that surface and links to
@@ -624,14 +625,16 @@ External-data qualification | `docs/external-qualification.md`
 
 This document completes the operational-documentation requirement.
 
-It does not by itself make Lasagna production-ready.
+It does not by itself establish production readiness; that decision is
+governed by the complete production-readiness gate.
 
-The controlling rule remains:
+The controlling rule is now satisfied:
 
 ```text
-Lasagna is production-ready only when every mandatory gate in
-docs/production-readiness.md is PASS and the parent tracker #12 satisfies its
-final closure audit.
+Lasagna is production-ready for the documented baseline because every mandatory
+gate in docs/production-readiness.md is PASS and the parent tracker #12 final
+aggregate audit completed with no blockers.
 ```
 
-Until then, Lasagna continues to identify itself as experimental.
+This qualification applies only to the explicitly documented univariate
+whole-file scope and accepted residual risks.

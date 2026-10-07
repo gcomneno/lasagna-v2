@@ -12,8 +12,8 @@ Status:
 
 ```text
 TRACKING CONTRACT FROZEN
-PROJECT STATUS = EXPERIMENTAL
-PRODUCTION READY = NO
+PROJECT STATUS = PRODUCTION-QUALIFIED
+PRODUCTION READY = YES
 ```
 
 ## Purpose
@@ -81,11 +81,11 @@ Lasagna may describe itself as production-ready only when all mandatory gates
 in this document are `PASS` and the evidence is reproducible from the
 repository or linked release artifacts.
 
-Until then, public project language SHALL continue to identify Lasagna as:
+Until the complete gate passes, public project language SHALL continue to
+identify Lasagna as experimental research software.
 
-```text
-experimental research software
-```
+The complete gate has now passed; current public language may identify the
+documented baseline scope as production-qualified.
 
 ## Current project state
 
@@ -105,13 +105,13 @@ V2 default encode/decode
 Current declared project status:
 
 ```text
-experimental
+production-qualified
 ```
 
 Current production-readiness decision:
 
 ```text
-NOT READY
+READY
 ```
 
 ## Gate 1 — format stability
@@ -1108,10 +1108,11 @@ none
 Therefore:
 
 ```text
-PRODUCTION_READY_GATE=FAIL
+PRODUCTION_READY_GATE=PASS
 ```
 
-No mandatory implementation/policy gate remains non-PASS.
+No mandatory implementation/policy gate remains non-PASS, and the final
+aggregate audit completed with no blockers.
 
 ## Existing strong evidence
 
@@ -1258,8 +1259,8 @@ It SHALL NOT be used as a readiness percentage.
 ## Final rule
 
 ```text
-Lasagna remains experimental
-until every mandatory production-readiness gate is PASS.
+Lasagna may claim production readiness
+only while every mandatory production-readiness gate remains PASS.
 ```
 
 ## Issue #12 acceptance mapping
@@ -1303,13 +1304,13 @@ PASS
 Issue #12 may close now:
 
 ```text
-NO
+YES
 ```
 
 Reason:
 
 ```text
-all mandatory gates are PASS; final Issue #12 audit is still required
+all mandatory gates are PASS; final aggregate audit completed with no blockers
 ```
 
 ## Meta gates
@@ -1323,6 +1324,6 @@ PERFORMANCE_REQUIREMENTS_GATE=PASS
 REAL_WORLD_VALIDATION_REQUIREMENTS_GATE=PASS
 EXPERIMENTAL_STATUS_GATE=PASS
 
-PRODUCTION_READY_GATE=FAIL
-ISSUE_12_CLOSE_GATE=BLOCKED
+PRODUCTION_READY_GATE=PASS
+ISSUE_12_CLOSE_GATE=PASS
 ```

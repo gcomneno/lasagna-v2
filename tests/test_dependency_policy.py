@@ -133,14 +133,17 @@ def test_action_reference_policy_matches_current_workflows() -> None:
     assert "accepted residual supply-chain risk" in policy
 
 
-def test_gate_16_is_pass_and_final_audit_remains_required() -> None:
+def test_gate_16_is_pass_in_final_production_ready_state() -> None:
     text = READINESS.read_text(encoding="utf-8")
 
     assert "16 dependency policy            PASS" in text
     assert "Current mandatory PASS count:\n\n```text\n18\n```" in text
     assert (
-        "all mandatory gates are PASS; final Issue #12 audit is still required" in text
+        "all mandatory gates are PASS; final aggregate audit completed with no blockers"
+        in text
     )
+    assert "PRODUCTION_READY_GATE=PASS" in text
+    assert "ISSUE_12_CLOSE_GATE=PASS" in text
 
 
 def test_security_review_points_to_dependency_policy() -> None:

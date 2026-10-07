@@ -9,8 +9,8 @@
 
 ![Lasagna 2 codec overview](docs/assets/lasagna2-codec-overview.png)
 
-Lasagna 2 is an experimental predictive codec for structured, univariate time
-series.
+Lasagna 2 is a production-qualified predictive codec for structured,
+univariate time series.
 
 Instead of treating a signal as an opaque byte stream, it divides the series
 into locally predictable segments, fits a small predictor to each segment, and
@@ -20,15 +20,16 @@ The project is primarily a **rate-distortion and representation experiment**.
 It is not presented as a universal replacement for general-purpose
 compressors.
 
-> **Research status:** experimental, reproducible, and intentionally explicit
-> about its assumptions and limitations.
+> **Production status:** production-qualified for the documented univariate
+> whole-file scope, with reproducible evidence, explicit operational
+> boundaries, and assumptions and limitations stated explicitly.
 
 For deployment-oriented guidance, start with
 [`docs/production-operations.md`](docs/production-operations.md). It collects
 the supported operational surface, failure/security boundaries, resource and
 performance expectations, migration guidance, and links to the authoritative
-contracts. Lasagna remains experimental until the production-readiness tracker
-passes every mandatory gate.
+contracts. The production-readiness tracker has passed for the documented
+baseline scope.
 
 ---
 
@@ -460,7 +461,8 @@ hard-coded here; the test suite is the authoritative executable evidence.
 
 ## Limitations
 
-Lasagna 2 is research software.
+Lasagna 2 is production-qualified for its documented univariate whole-file
+baseline.
 
 Current boundaries include:
 
