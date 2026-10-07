@@ -36,31 +36,50 @@ TimeSeries(
 )
 ```
 
-The CLI reads the first parseable numeric column from its input CSV and builds a
-univariate series.
+`TimeSeries` remains a lightweight container. Numeric validation occurs when an
+encoder is invoked.
 
-Operationally, production callers should provide ordinary finite real-valued
-samples.
-
-The complete numeric-domain production contract is not yet qualified. In
-particular, callers must not infer production guarantees for:
+Production encoding supports:
 
 ```text
-NaN
-positive or negative infinity
-extreme-magnitude values near representation boundaries
-all possible quantization-overflow cases
-all possible residual-integer extremes
+samples               finite real-valued Python int/float values
+dt                    finite and > 0
+C_Q                   finite and >= 0
+Q_MIN                 finite and > 0
+mse_threshold         finite and >= 0
+fixed segment_length  positive integer
+adaptive min/max      positive integers with max >= min
+quantized residuals   signed int32
+                      [-2147483648, 2147483647]
 ```
 
-The authoritative readiness status for these questions is Gate 17 in
-`docs/production-readiness.md`, which remains `PARTIAL`.
+There is no arbitrary application-level magnitude ceiling for finite samples.
+Instead, a finite input is rejected with `ValueError` if required statistics,
+prediction, quantization, V2 metadata conversion or residual representation
+cannot remain inside the supported numeric domain.
 
-Therefore:
+`C_Q=0` is supported when `Q_MIN` is positive.
 
-```text
-DOCUMENTED INPUT DOMAIN != FULL NUMERIC-DOMAIN QUALIFICATION
-```
+The CLI parses the first comma-separated field of each non-empty,
+non-comment line as a float. Lines whose first field cannot be parsed are
+skipped. Parsed `NaN`, infinity and overflow-to-infinity values are not skipped:
+they reach the shared encoder validation and are rejected before output bytes
+are written.
+
+All newly encoded residuals must fit signed int32, regardless of whether the
+selected residual representation is raw, varint, zero-run or automatic.
+
+For V2, segment metadata is rounded through the frozen binary32 layout before
+the final residuals are calculated. Those post-rounding residuals are checked
+against the same signed-int32 contract, so binary32 metadata rounding cannot
+bypass the residual bound.
+
+The authoritative encoder contract is
+`docs/public-api-contract.md`.
+
+Historical decoder compatibility is intentionally broader than new encoder
+acceptance. Existing V1 artifacts are still decoded according to the frozen
+legacy semantics; Issue #21 does not redefine historical V1 bytes.
 
 ## Lossy semantics
 

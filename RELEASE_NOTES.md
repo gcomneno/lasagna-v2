@@ -15,6 +15,28 @@ retaining explicit V1 encoding and full V1/V2 decode compatibility.
   remains the compatibility baseline.
 - V1 is now compatibility-only; new encoder development targets V2.
 
+
+## Numeric-domain hardening
+
+Production encoders now reject unsupported numeric inputs explicitly instead of
+relying on incidental Python or `struct` failures.
+
+The supported encoder domain requires finite samples, finite positive `dt`,
+finite `C_Q >= 0`, finite `Q_MIN > 0`, finite
+`mse_threshold >= 0` and signed-int32 quantized residuals.
+
+Out-of-range residuals are rejected consistently for raw, varint, zero-run and
+automatic residual coding, including V2 residuals recomputed after binary32
+metadata rounding.
+
+These changes narrow previously accidental encoder acceptance in order to
+prevent silent corruption and normalize numeric-domain failures to
+`ValueError`.
+
+No wire-format change is introduced. Existing V1/V2 artifacts retain their
+documented decode compatibility, and historical V1 decoder behavior is
+unchanged.
+
 ## Compatibility note
 
 This is a behavioral change for callers that previously relied on the default

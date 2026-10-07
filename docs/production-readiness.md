@@ -890,33 +890,44 @@ extreme magnitude behavior
 Current evidence:
 
 ```text
-docs/rate-distortion-design.md
-docs/security-review.md
-docs/production-operations.md
+lasagna2/core.py
+tests/test_numeric_domain.py
 tests/test_core_v2_wire.py
+tests/test_v1_frozen_compatibility.py
 tests/test_residual_zero_run_codec.py
+docs/public-api-contract.md
+docs/production-operations.md
+docs/security-review.md
+docs/rate-distortion-design.md
+RELEASE_NOTES.md
 ```
 
 Current status:
 
 ```text
-BLOCKER
+PASS
 ```
 
-Final-audit finding:
+Qualified production contract:
 
 ```text
-The encoder does not yet define and enforce a complete numeric-domain contract.
-
-Unsupported non-finite or extreme inputs and out-of-range quantized residuals
-can currently fail through incidental Python/struct behavior.
-
-The varint residual path can silently misrepresent integers outside the
-signed-int32 domain.
-
-Documentation alone is therefore insufficient: focused implementation
-hardening, boundary tests and an explicit numeric-domain contract are required.
+encoder samples              finite real int/float values
+dt                           finite and > 0
+C_Q                          finite and >= 0
+Q_MIN                        finite and > 0
+mse_threshold                finite and >= 0
+quantized residual domain    signed int32
+encoder numeric failures     ValueError
+V1 decoder compatibility     unchanged
+V2 binary32 layout           unchanged
 ```
+
+Issue #21 closes the final-audit blocker by enforcing the numeric domain before
+emission, normalizing encoder arithmetic failures, bounding every newly encoded
+quantized residual to signed int32 and applying the same guard after V2
+binary32 metadata rounding.
+
+The frozen historical V1 decoder remains unchanged.
 
 ## Gate 18 — operational observability
 
@@ -1031,7 +1042,6 @@ Current non-PASS mandatory gates are:
 ```text
 regression/CI reliability    PARTIAL
 dependency policy            PARTIAL
-supported numeric domain     BLOCKER
 ```
 
 Therefore:
@@ -1040,7 +1050,7 @@ Therefore:
 PRODUCTION_READY_GATE=FAIL
 ```
 
-Issue #12 remains blocked by gates 14, 16 and 17.
+Issue #12 remains blocked by gates 14 and 16.
 
 ## Existing strong evidence
 
@@ -1168,7 +1178,7 @@ Affected gates require requalification.
 14 regression/CI reliability    PARTIAL
 15 deterministic behavior       PASS
 16 dependency policy            PARTIAL
-17 supported numeric domain     BLOCKER
+17 supported numeric domain     PASS
 18 operational observability    PASS
 19 access behavior              N/A
 20 multivariate behavior        N/A
@@ -1177,7 +1187,7 @@ Affected gates require requalification.
 Current mandatory PASS count:
 
 ```text
-15
+16
 ```
 
 This count is informational only.
@@ -1238,8 +1248,7 @@ NO
 Reason:
 
 ```text
-mandatory gates 14 and 16 remain PARTIAL;
-mandatory gate 17 is BLOCKER
+mandatory gates 14 and 16 remain PARTIAL
 ```
 
 ## Meta gates

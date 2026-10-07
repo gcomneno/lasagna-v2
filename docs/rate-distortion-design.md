@@ -2780,3 +2780,35 @@ Any future change to the frozen V2 segment-entry field order, field types,
 endianness or 32-byte size is a normative physical-format change and SHALL
 follow the protocol revision policy rather than reopening M2.3.
 
+## Production encoder numeric-domain supplement
+
+Issue #21 adds a production validation boundary without changing the frozen
+rate-distortion experiments, anchors, candidate-layout evidence or V1/V2 wire
+semantics described above.
+
+For production encoding:
+
+```text
+samples             finite real values
+C_Q                 finite and >= 0
+Q_MIN               finite and > 0
+quantized residual  signed int32
+```
+
+The quantizer retains nearest/ties-to-even rounding.
+
+The selected step remains:
+
+```text
+Q = max(C_Q * sigma, Q_MIN)
+```
+
+but all required intermediate statistics and ratios must remain finite.
+
+For V2, residuals are recomputed after metadata is rounded through the frozen
+binary32 segment representation and are then subjected to the same signed-int32
+bound. This closes the possibility that a residual which was acceptable before
+metadata rounding becomes out-of-domain afterward.
+
+This supplement is an encoder production contract. It does not retroactively
+change the frozen experimental methodology or historical V1 decoder semantics.

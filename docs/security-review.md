@@ -715,3 +715,28 @@ PRODUCTION_READINESS_GATE_3=PASS
 PRODUCTION_READINESS_GATE_6=PASS
 PRODUCTION_READINESS_GATE_10=PASS
 ```
+
+## Encoder numeric-domain hardening — Issue #21
+
+The production encoder now rejects unsupported numeric input before emitting
+LSG2 bytes.
+
+The enforced encoder domain requires finite real samples, finite positive
+`dt`, finite `C_Q >= 0`, finite `Q_MIN > 0`, finite
+`mse_threshold >= 0`, valid active segment-length controls and signed-int32
+quantized residuals.
+
+Arithmetic overflow and non-finite statistics, prediction-error measurements,
+quantization intermediates or residual ratios are normalized to `ValueError`.
+
+The signed-int32 residual bound is enforced before every production residual
+representation. `zigzag_encode()` independently enforces the same bound, so
+direct varint and zero-run helper use cannot silently encode integers outside
+the intended ZigZag domain.
+
+V2 also rechecks residuals after segment metadata has been rounded through the
+frozen binary32 layout.
+
+This hardening affects encoder acceptance only. Historical V1 decoder behavior
+is intentionally preserved for compatibility and remains broader than the set
+of values a new encoder is permitted to emit.

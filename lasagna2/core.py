@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import List, Tuple
-
 import json
 import math
 import struct
+from dataclasses import dataclass
+from typing import List, Tuple
 
 
 # ---------------------------------------------------------------------------
@@ -230,6 +229,8 @@ RESIDUAL_BLOCK_HEADER_STRUCT = struct.Struct("<III")
 # Production resource limits
 # ---------------------------------------------------------------------------
 UINT32_MAX = (1 << 32) - 1
+INT32_MIN = -(1 << 31)
+INT32_MAX = (1 << 31) - 1
 
 MAX_POINTS = 10_000_000
 MAX_SEGMENTS = 1_000_000
@@ -577,8 +578,22 @@ def _validate_encoded_size(size: int) -> None:
 # ---------------------------------------------------------------------------
 # Varint / ZigZag helpers
 # ---------------------------------------------------------------------------
+def _require_int32_residual(value: int) -> int:
+    """Validate the production residual-integer domain."""
+    value = int(value)
+
+    if value < INT32_MIN or value > INT32_MAX:
+        raise ValueError(
+            "Quantized residual must be within signed int32 range "
+            f"[{INT32_MIN}, {INT32_MAX}]"
+        )
+
+    return value
+
+
 def zigzag_encode(n: int) -> int:
-    """Map signed int -> unsigned for varint."""
+    """Map a signed-int32 residual to unsigned ZigZag form."""
+    n = _require_int32_residual(n)
     return (n << 1) ^ (n >> 31)
 
 
@@ -722,6 +737,92 @@ def decode_int_list_zero_run_varint(
 # ---------------------------------------------------------------------------
 # Stats, predittori, quantizzazione
 # ---------------------------------------------------------------------------
+def _require_finite_real(value: object, name: str) -> float:
+    """Return a finite real value as float or reject it with ValueError."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(  # noqa: TRY004 - public encoder contract uses ValueError
+            f"{name} must be a finite real number"
+        )
+
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError(f"{name} must be a finite real number") from exc
+
+    if not math.isfinite(numeric):
+        raise ValueError(f"{name} must be finite")
+
+    return numeric
+
+
+def _require_positive_int(value: object, name: str) -> int:
+    """Validate a positive integer encoder control."""
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        raise ValueError(f"{name} must be a positive integer")
+
+    return value
+
+
+def _validate_encoder_inputs(
+    ts: TimeSeries,
+    *,
+    segment_length: int,
+    C_Q: float,
+    Q_MIN: float,
+    segment_mode: str,
+    min_segment_length: int,
+    max_segment_length: int,
+    mse_threshold: float,
+) -> None:
+    """Validate the supported production encoder numeric domain."""
+    for index, value in enumerate(ts.values):
+        _require_finite_real(
+            value,
+            f"TimeSeries.values[{index}]",
+        )
+
+    dt = _require_finite_real(ts.dt, "dt")
+
+    if dt <= 0.0:
+        raise ValueError("dt must be finite and > 0")
+
+    c_q = _require_finite_real(C_Q, "C_Q")
+
+    if c_q < 0.0:
+        raise ValueError("C_Q must be finite and >= 0")
+
+    q_min = _require_finite_real(Q_MIN, "Q_MIN")
+
+    if q_min <= 0.0:
+        raise ValueError("Q_MIN must be finite and > 0")
+
+    mse = _require_finite_real(
+        mse_threshold,
+        "mse_threshold",
+    )
+
+    if mse < 0.0:
+        raise ValueError("mse_threshold must be finite and >= 0")
+
+    if segment_mode == "fixed":
+        _require_positive_int(
+            segment_length,
+            "segment_length",
+        )
+    elif segment_mode == "adaptive":
+        minimum = _require_positive_int(
+            min_segment_length,
+            "min_segment_length",
+        )
+        maximum = _require_positive_int(
+            max_segment_length,
+            "max_segment_length",
+        )
+
+        if maximum < minimum:
+            raise ValueError("max_segment_length must be >= " "min_segment_length")
+
+
 def compute_stats(x: List[float]) -> Tuple[float, float, float, float]:
     """
     Calcola (mean, slope, intercept, variance) su x con regressione lineare
@@ -730,28 +831,71 @@ def compute_stats(x: List[float]) -> Tuple[float, float, float, float]:
     n = len(x)
     if n == 0:
         return 0.0, 0.0, 0.0, 0.0
-    mean = sum(x) / n
-    if n == 1:
-        return mean, 0.0, mean, 0.0
 
-    # Regressione lineare semplice
-    # t = 0..n-1
-    t_vals = range(n)
-    sum_t = (n - 1) * n / 2.0
-    sum_t2 = (n - 1) * n * (2 * n - 1) / 6.0
-    sum_x = float(sum(x))
-    sum_tx = sum(t * v for t, v in zip(t_vals, x))
+    try:
+        mean = sum(x) / n
 
-    denom = n * sum_t2 - sum_t * sum_t
-    if denom == 0:
-        slope = 0.0
-    else:
-        slope = (n * sum_tx - sum_t * sum_x) / denom
-    intercept = mean - slope * (sum_t / n)
+        if n == 1:
+            result = (
+                mean,
+                0.0,
+                mean,
+                0.0,
+            )
+        else:
+            # Regressione lineare semplice
+            # t = 0..n-1
+            t_vals = range(n)
+            sum_t = (n - 1) * n / 2.0
+            sum_t2 = (n - 1) * n * (2 * n - 1) / 6.0
+            sum_x = float(sum(x))
+            sum_tx = sum(
+                t * v
+                for t, v in zip(
+                    t_vals,
+                    x,
+                )
+            )
 
-    # Varianza
-    var = sum((v - mean) ** 2 for v in x) / n
-    return mean, slope, intercept, var
+            denom = n * sum_t2 - sum_t * sum_t
+
+            if denom == 0:
+                slope = 0.0
+            else:
+                slope = (n * sum_tx - sum_t * sum_x) / denom
+
+            intercept = mean - slope * (sum_t / n)
+
+            var = sum((v - mean) ** 2 for v in x) / n
+
+            result = (
+                mean,
+                slope,
+                intercept,
+                var,
+            )
+    except OverflowError as exc:
+        raise ValueError(
+            "Encoder statistics exceed the supported numeric domain"
+        ) from exc
+
+    mean, slope, intercept, var = result
+
+    if any(
+        not math.isfinite(value)
+        for value in (
+            mean,
+            slope,
+            intercept,
+            var,
+        )
+    ):
+        raise ValueError("Encoder statistics must remain finite")
+
+    if var < 0.0:
+        raise ValueError("Encoder variance must be non-negative")
+
+    return result
 
 
 def predict_mean_const(length: int, mean: float) -> List[float]:
@@ -777,6 +921,49 @@ def predict_random_walk(x: List[float], seed: float) -> List[float]:
     return preds
 
 
+def _quantize_residuals_at_step(
+    residuals: List[float],
+    Q: float,
+) -> List[int]:
+    """Quantize residuals at a validated step within signed-int32 bounds."""
+    q_value = _require_finite_real(
+        Q,
+        "quantization step Q",
+    )
+
+    if q_value <= 0.0:
+        raise ValueError("quantization step Q must be finite and > 0")
+
+    quantized: List[int] = []
+
+    for residual in residuals:
+        residual_value = _require_finite_real(
+            residual,
+            "residual",
+        )
+
+        try:
+            ratio = residual_value / q_value
+        except OverflowError as exc:
+            raise ValueError(
+                "Residual quantization exceeds the supported numeric domain"
+            ) from exc
+
+        if not math.isfinite(ratio):
+            raise ValueError("Residual quantization ratio must remain finite")
+
+        try:
+            rounded = round(ratio)
+        except (OverflowError, ValueError) as exc:
+            raise ValueError(
+                "Residual quantization exceeds the supported numeric domain"
+            ) from exc
+
+        quantized.append(_require_int32_residual(rounded))
+
+    return quantized
+
+
 def quantize_residuals(
     residuals: List[float],
     C_Q: float = 0.5,
@@ -786,16 +973,61 @@ def quantize_residuals(
     Quantizza residui float in interi usando passo Q = max(C_Q * sigma, Q_MIN).
     Restituisce (q_residuals, Q).
     """
+    c_q = _require_finite_real(
+        C_Q,
+        "C_Q",
+    )
+
+    if c_q < 0.0:
+        raise ValueError("C_Q must be finite and >= 0")
+
+    q_min = _require_finite_real(
+        Q_MIN,
+        "Q_MIN",
+    )
+
+    if q_min <= 0.0:
+        raise ValueError("Q_MIN must be finite and > 0")
+
     if not residuals:
-        return [], Q_MIN
+        return [], q_min
+
     n = len(residuals)
-    mean = sum(residuals) / n
-    var = sum((r - mean) ** 2 for r in residuals) / n
-    sigma = math.sqrt(var)
-    Q = max(C_Q * sigma, Q_MIN)
-    if Q == 0.0:
-        Q = Q_MIN
-    q_res = [int(round(r / Q)) for r in residuals]
+
+    try:
+        mean = sum(residuals) / n
+        var = sum((r - mean) ** 2 for r in residuals) / n
+        sigma = math.sqrt(var)
+        scaled_sigma = c_q * sigma
+    except OverflowError as exc:
+        raise ValueError(
+            "Residual statistics exceed the supported numeric domain"
+        ) from exc
+
+    if any(
+        not math.isfinite(value)
+        for value in (
+            mean,
+            var,
+            sigma,
+            scaled_sigma,
+        )
+    ):
+        raise ValueError("Residual statistics must remain finite")
+
+    if var < 0.0:
+        raise ValueError("Residual variance must be non-negative")
+
+    Q = max(
+        scaled_sigma,
+        q_min,
+    )
+
+    q_res = _quantize_residuals_at_step(
+        residuals,
+        Q,
+    )
+
     return q_res, Q
 
 
@@ -883,7 +1115,25 @@ def segment_series_adaptive(
                 seed_value=seed_value,
             )
             if length > 0:
-                mse = sum((v - p) ** 2 for v, p in zip(x_seg, preds)) / length
+                try:
+                    mse = (
+                        sum(
+                            (v - p) ** 2
+                            for v, p in zip(
+                                x_seg,
+                                preds,
+                            )
+                        )
+                        / length
+                    )
+                except OverflowError as exc:
+                    raise ValueError(
+                        "Adaptive segmentation MSE exceeds the "
+                        "supported numeric domain"
+                    ) from exc
+
+                if not math.isfinite(mse):
+                    raise ValueError("Adaptive segmentation MSE must remain finite")
             else:
                 mse = 0.0
 
@@ -976,6 +1226,17 @@ def _build_encoding_model(
     if n_points > MAX_POINTS:
         raise ValueError(f"n_points={n_points} exceeds maximum {MAX_POINTS}")
 
+    _validate_encoder_inputs(
+        ts,
+        segment_length=segment_length,
+        C_Q=C_Q,
+        Q_MIN=Q_MIN,
+        segment_mode=segment_mode,
+        min_segment_length=min_segment_length,
+        max_segment_length=max_segment_length,
+        mse_threshold=mse_threshold,
+    )
+
     predictor_map = {
         "mean": 0,
         "linear": 1,
@@ -1067,16 +1328,24 @@ def _build_encoding_model(
                             x_hat_c[index] = preds_dec[index] + q_res_c[index] * Q_c
 
                 if length > 0:
-                    mse_c = (
-                        sum(
-                            (value - reconstructed) ** 2
-                            for value, reconstructed in zip(
-                                x_seg,
-                                x_hat_c,
+                    try:
+                        mse_c = (
+                            sum(
+                                (value - reconstructed) ** 2
+                                for value, reconstructed in zip(
+                                    x_seg,
+                                    x_hat_c,
+                                )
                             )
+                            / length
                         )
-                        / length
-                    )
+                    except OverflowError as exc:
+                        raise ValueError(
+                            "Auto predictor MSE exceeds the " "supported numeric domain"
+                        ) from exc
+
+                    if not math.isfinite(mse_c):
+                        raise ValueError("Auto predictor MSE must remain finite")
                 else:
                     mse_c = 0.0
 
@@ -1606,7 +1875,18 @@ def encode_timeseries_v2(
 
         Q = seg.quant_step_Q
 
-        q_res = [round((value - pred) / Q) for value, pred in zip(x_seg, preds)]
+        residuals = [
+            value - pred
+            for value, pred in zip(
+                x_seg,
+                preds,
+            )
+        ]
+
+        q_res = _quantize_residuals_at_step(
+            residuals,
+            Q,
+        )
 
         q_resid_segments.append(q_res)
 

@@ -52,13 +52,13 @@ def test_operations_guide_links_authoritative_contracts() -> None:
         assert reference in text
 
 
-def test_operations_guide_keeps_incomplete_gates_explicit() -> None:
+def test_operations_guide_documents_qualified_numeric_domain() -> None:
     text = OPERATIONS.read_text(encoding="utf-8")
 
-    assert "Gate 17" in text
-    assert "Gate 18" in text
-    assert "FULL NUMERIC-DOMAIN QUALIFICATION" in text
-    assert "FULL OBSERVABILITY QUALIFICATION = NOT YET COMPLETE" in text
+    assert "finite real-valued Python int/float values" in text
+    assert "signed int32" in text
+    assert "docs/public-api-contract.md" in text
+    assert "Historical decoder compatibility" in text
 
 
 def test_operations_guide_keeps_experimental_boundary() -> None:
@@ -77,7 +77,7 @@ def test_readme_points_to_operations_guide_and_has_no_stale_claims() -> None:
     assert "no stability guarantee for future protocol revisions;" not in text
 
 
-def test_gate_12_is_pass_with_final_audit_statuses_for_17_and_18() -> None:
+def test_final_audit_statuses_after_numeric_domain_qualification() -> None:
     text = READINESS.read_text(encoding="utf-8")
 
     assert re.search(
@@ -86,7 +86,7 @@ def test_gate_12_is_pass_with_final_audit_statuses_for_17_and_18() -> None:
     )
 
     assert re.search(
-        r"(?m)^\s*17\s+supported numeric domain\s+BLOCKER\s*$",
+        r"(?m)^\s*17\s+supported numeric domain\s+PASS\s*$",
         text,
     )
 
@@ -96,6 +96,6 @@ def test_gate_12_is_pass_with_final_audit_statuses_for_17_and_18() -> None:
     )
 
     assert re.search(
-        r"Current mandatory PASS count:\s*" r"\n\s*```text\s*\n15\s*\n```",
+        r"Current mandatory PASS count:\s*" r"\n\s*```text\s*\n16\s*\n```",
         text,
     )

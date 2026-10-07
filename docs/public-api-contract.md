@@ -21,6 +21,53 @@ repository symbols remain implementation details.
 It does not define wire-version lifetime or future V3 migration policy. Those
 remain release/versioning work under issue #18.
 
+
+## Encoder numeric-domain contract
+
+Production encoding accepts finite real-valued samples and finite encoder
+controls within the following domain:
+
+```text
+samples               finite Python int/float values
+dt                    finite and > 0
+C_Q                   finite and >= 0
+Q_MIN                 finite and > 0
+mse_threshold         finite and >= 0
+fixed segment_length  positive integer
+adaptive min length   positive integer
+adaptive max length   positive integer and >= min length
+quantized residual    signed int32:
+                      -2147483648 .. 2147483647
+```
+
+`TimeSeries` remains a lightweight data container. Construction itself does not
+reject unsupported numeric values; validation occurs when a public encoder is
+called.
+
+`encode_timeseries()`, `encode_timeseries_v1()` and `encode_timeseries_v2()`
+apply the same production numeric-domain validation before segmentation.
+
+Unsupported numeric inputs, arithmetic overflow, non-finite intermediate
+statistics, invalid quantization state, metadata representability failures and
+out-of-range quantized residuals fail with `ValueError`.
+
+Exact exception messages are diagnostic rather than API-stable.
+
+`C_Q=0` is valid when `Q_MIN > 0`; this selects the positive quantization floor.
+
+V2 preserves the frozen binary32 metadata representation. Its serialized real
+segment fields must remain finite and its rounded quantization step must remain
+strictly positive. Non-Q metadata may underflow to signed zero. A positive
+binary32 subnormal `Q` is valid; a `Q` that rounds to zero is rejected.
+
+Every newly encoded residual is restricted to signed int32 regardless of
+residual representation. This applies to raw, varint, zero-run and automatic
+V2 selection, and prevents out-of-domain ZigZag values from being emitted.
+
+The stricter encoder contract does not change historical decode compatibility.
+Existing V1 artifacts retain their legacy decoder semantics, including numeric
+cases that new encoders no longer produce.
+
 ## Public Python surface
 
 The supported Python API is exactly the package export surface:
