@@ -1,0 +1,12 @@
+dataset,evidence_group,coverage_status,primary_target_count,A0_covered,A1_covered,A4_covered,complete_primary_coverage,material_wins,practical_ties,material_losses,non_loss_fraction,median_rate_ratio,best_rate_ratio,worst_rate_ratio
+trend.csv,internal,INSUFFICIENT_COVERAGE,0,0,0,0,0,0,0,0,,,,
+sine_noise.csv,internal,COMPLETE,17,17,17,17,17,0,0,17,0.0,1.4721030042918455,1.4721030042918455,1.4721030042918455
+flat_spike.csv,internal,COMPLETE,14,14,14,14,14,0,0,14,0.0,1.2832618025751072,1.2805139186295502,1.2832618025751072
+appliances-energy.csv,external,COMPLETE,17,17,17,17,17,0,0,17,0.0,2.361941610974323,2.3282480558720096,2.361941610974323
+metro-traffic.csv,external,COMPLETE,17,17,17,17,17,0,0,17,0.0,2.3699400454827373,2.3699400454827373,2.370787678313004
+beijing-pm25.csv,external,COMPLETE,15,15,15,15,15,0,0,15,0.0,2.3672642471942864,2.350001446884857,2.3672642471942864
+seoul-bike-demand.csv,external,COMPLETE,17,17,17,17,17,0,0,17,0.0,2.3457315706923594,2.3412725036341273,2.3457315706923594
+fan-vibration-x.csv,external,COMPLETE,15,15,15,15,15,0,0,15,0.0,1.5598892704647245,1.5365648172563042,1.5598892704647245
+dow-jones-weekly-return.csv,external,COMPLETE,9,9,9,9,9,0,9,0,1.0,1.0,1.0,1.0
+room-occupancy-count.csv,external,COMPLETE,6,6,6,6,6,0,0,6,0.0,1.337639630888781,1.337639630888781,1.337639630888781
+tetouan-zone1-power.csv,external,COMPLETE,11,11,11,11,11,0,0,11,0.0,2.36982237267506,2.36982237267506,2.36982237267506
