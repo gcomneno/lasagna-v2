@@ -503,16 +503,21 @@ diagnostic use.
 These interfaces reduce the need for manual binary inspection, but they are not
 integrity checks.
 
-Production-readiness Gate 18 remains `PARTIAL`: the repository does not yet
-claim a complete operational observability contract covering every required
-error-taxonomy/actionability/version-reporting expectation.
+Production-readiness Gate 18 is `PASS`.
+
+The qualified observability contract covers the public exception taxonomy,
+actionable failure messages, wire-version reporting, bounded metadata
+inspection and the supported diagnostic CLI surfaces.
 
 Therefore:
 
 ```text
 INSPECTION TOOLING = AVAILABLE
-FULL OBSERVABILITY QUALIFICATION = NOT YET COMPLETE
+OPERATIONAL OBSERVABILITY QUALIFICATION = COMPLETE
 ```
+
+These inspection surfaces remain diagnostic tools rather than integrity,
+authenticity or full-decodability guarantees.
 
 ## Migration guidance
 
@@ -577,8 +582,6 @@ archival losslessness
 universal compression superiority
 universal throughput guarantees
 universal peak-RSS guarantees
-full numeric-domain qualification
-full operational-observability qualification
 ```
 
 Multivariate and random-access/streaming capabilities are outside the current
@@ -599,7 +602,8 @@ Before adopting Lasagna for a deployment:
 7. Pin package/release expectations and supported wire versions explicitly.
 8. Use explicit V1 encoding only when legacy byte compatibility is required.
 9. Benchmark representative production workloads on deployment hardware.
-10. Review unresolved mandatory gates in `docs/production-readiness.md`.
+10. Review the current production-readiness decision and gate evidence in
+    `docs/production-readiness.md`.
 
 ## Authority map
 

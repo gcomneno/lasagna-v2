@@ -111,3 +111,39 @@ def test_all_mandatory_followup_gates_are_pass_before_final_audit() -> None:
         r"Current mandatory PASS count:\s*" r"\n\s*```text\s*\n18\s*\n```",
         text,
     )
+
+
+def test_operations_guide_has_no_stale_numeric_or_observability_claims() -> None:
+    text = OPERATIONS.read_text(encoding="utf-8")
+
+    stale = (
+        "Production-readiness Gate 18 remains `PARTIAL`",
+        "FULL OBSERVABILITY QUALIFICATION = NOT YET COMPLETE",
+        "full numeric-domain qualification",
+        "full operational-observability qualification",
+        "Review unresolved mandatory gates",
+    )
+
+    for value in stale:
+        assert value not in text
+
+    assert "Production-readiness Gate 18 is `PASS`." in text
+    assert "OPERATIONAL OBSERVABILITY QUALIFICATION = COMPLETE" in text
+
+
+def test_readme_documents_public_v2_zero_run_support() -> None:
+    text = README.read_text(encoding="utf-8")
+
+    assert "zero-run ZigZag + varint" in text
+    assert "V2 may use zero-run residual coding explicitly" in text
+    assert "not part of the currently implemented public V2 wire path" not in text
+
+
+def test_readme_has_no_stale_gate_17_or_18_limitation() -> None:
+    text = README.read_text(encoding="utf-8")
+
+    assert "incomplete production qualification for the full numeric domain" not in text
+    assert "operational observability;" not in text
+    assert (
+        "numeric-domain and operational-observability qualification completed" in text
+    )

@@ -56,7 +56,7 @@ jobs:
             echo "Installed from pyproject extras."
           elif [ -f requirements-dev.txt ]; then
             python -m pip install -r requirements-dev.txt
-          else:
+          else
             echo "No dev requirements found." >&2
             exit 1
           fi

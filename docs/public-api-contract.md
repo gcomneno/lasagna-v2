@@ -667,13 +667,17 @@ release artifact policy
 
 Those belong to the release/versioning contract tracked by issue #18.
 
-Therefore completion of issue #17:
+At completion of issue #17, the API-specific assessment was:
 
 ```text
 Gate 11 -> PASS
-Gate 1  -> remains PARTIAL
-Gate 2  -> remains PARTIAL
+Gate 1  -> PARTIAL at that historical checkpoint
+Gate 2  -> PARTIAL at that historical checkpoint
 ```
+
+Issue #18 subsequently completed the release/wire compatibility contract and
+promoted Gates 1 and 2 to `PASS`. Their current authoritative status is tracked
+in `docs/production-readiness.md` and `docs/release-versioning-policy.md`.
 
 ## Gates
 

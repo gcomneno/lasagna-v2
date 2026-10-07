@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+from pathlib import Path
 
 import lasagna2
 from lasagna2 import cli, core
@@ -231,3 +232,14 @@ def test_cli_info_verbose_default_contract() -> None:
     )
 
     assert args.verbose is False
+
+
+def test_historical_gate_1_2_assessment_is_marked_as_superseded() -> None:
+    contract = Path(__file__).resolve().parents[1] / "docs" / "public-api-contract.md"
+    text = contract.read_text(encoding="utf-8")
+
+    assert "PARTIAL at that historical checkpoint" in text
+    assert "Issue #18 subsequently completed" in text
+    assert "promoted Gates 1 and 2 to `PASS`" in text
+    assert "Gate 1  -> remains PARTIAL" not in text
+    assert "Gate 2  -> remains PARTIAL" not in text

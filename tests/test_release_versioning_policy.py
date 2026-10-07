@@ -111,3 +111,10 @@ def test_gate_14_is_pass_after_runtime_and_ci_policy_freeze() -> None:
     assert "Python 3.12" in text
     assert "Ubuntu 24.04" in text
     assert "required workflow/job = CI / Lint & Test" in text
+
+
+def test_ci_dev_dependency_fallback_has_valid_shell_else() -> None:
+    workflow = CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "          else\n" in workflow
+    assert "          else:\n" not in workflow

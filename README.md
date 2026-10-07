@@ -148,10 +148,11 @@ Per-segment predictors:
 Residual coding currently exposed by the public wire path:
 
 - raw signed int32;
-- ZigZag + varint.
+- ZigZag + varint;
+- zero-run ZigZag + varint.
 
-Zero-run residual coding has been explored as a research candidate, but it is
-**not part of the currently implemented public V2 wire path**.
+V2 may use zero-run residual coding explicitly, and `auto` may select it when
+its encoded representation is smaller.
 
 ---
 
@@ -471,8 +472,9 @@ Current boundaries include:
 - no claim of universal compression superiority;
 - V1/V2 wire and public API/CLI compatibility governed by the published
   stability/deprecation contracts;
-- incomplete production qualification for the full numeric domain and
-  operational observability;
+- numeric-domain and operational-observability qualification completed, with
+  the overall production-readiness decision governed by
+  `docs/production-readiness.md`;
 - not intended as a lossless production archival format.
 
 The V2 result should be interpreted as a controlled comparison against the
