@@ -81,6 +81,33 @@ Historical decoder compatibility is intentionally broader than new encoder
 acceptance. Existing V1 artifacts are still decoded according to the frozen
 legacy semantics; Issue #21 does not redefine historical V1 bytes.
 
+## Runtime and CI qualification
+
+The current production-qualified execution matrix is:
+
+```text
+Python   3.12
+OS       Ubuntu 24.04
+CI       .github/workflows/ci.yml
+job      CI / Lint & Test
+```
+
+This is intentionally narrower than `requires-python = ">=3.10"` in
+`pyproject.toml`.
+
+The packaging declaration defines the interpreter range on which installation
+is permitted. It is not evidence that every interpreter or platform in that
+range has completed production qualification.
+
+For release publication, the `CI / Lint & Test` result for the exact release
+commit must exist and complete successfully. Failed, cancelled, skipped,
+pending or missing required CI blocks publication.
+
+Local `pytest` and pre-commit results remain useful development checks but do
+not replace the required CI result on the release commit.
+
+The authoritative policy is `docs/release-versioning-policy.md`.
+
 ## Lossy semantics
 
 Lasagna is a predictive lossy codec when quantization is active.

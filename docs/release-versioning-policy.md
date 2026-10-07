@@ -549,7 +549,81 @@ retain safe legacy decode only where defensible
 document the security boundary explicitly
 ```
 
-## 16. Release checklist
+## 16. Supported runtime and release-blocking CI policy
+
+The current production-qualified runtime matrix is deliberately narrower than
+the package installation declaration.
+
+```text
+production-qualified Python   = 3.12
+production-qualified platform = Ubuntu 24.04
+canonical CI workflow         = .github/workflows/ci.yml
+release-blocking job          = CI / Lint & Test
+```
+
+`pyproject.toml` currently declares:
+
+```text
+requires-python = ">=3.10"
+```
+
+That declaration means the package may be installed on Python 3.10 or newer.
+It does not, by itself, constitute production-qualification evidence for every
+such interpreter or operating system.
+
+Therefore:
+
+```text
+PACKAGE INSTALLABILITY RANGE != PRODUCTION-QUALIFIED RUNTIME MATRIX
+```
+
+A Python/platform combination becomes part of the production-qualified matrix
+only after it is explicitly added to this policy and exercised by required CI
+for release candidates.
+
+For the current baseline, the canonical CI job runs on:
+
+```text
+Ubuntu 24.04
+Python 3.12
+```
+
+and executes:
+
+```text
+pre-commit run --all-files --show-diff-on-failure
+pytest -vv
+```
+
+The `CI / Lint & Test` result for the exact commit intended for release is
+release-blocking.
+
+Before a release may be published, that required CI result must exist and must
+have completed successfully.
+
+The following states block release publication:
+
+```text
+failure
+cancelled
+skipped
+missing / not run for the release commit
+still pending
+```
+
+A locally successful test run or pre-commit run is useful development evidence,
+but it does not substitute for the required GitHub CI result on the release
+commit.
+
+Security, CodeQL, dependency-review, pip-audit and OpenSSF Scorecard workflows
+retain their own security and supply-chain contracts. Issue #22 does not
+silently redefine every auxiliary workflow as a Gate 14 release blocker.
+
+If the production-qualified runtime matrix or release-blocking CI set changes,
+the policy, workflow and regression tests must change together in the same
+reviewed change.
+
+## 17. Release checklist
 
 Before publishing a release:
 
@@ -560,8 +634,9 @@ Before publishing a release:
 [ ] public API contract reviewed if affected
 [ ] wire-format contract reviewed if affected
 [ ] migration guidance present for compatibility changes
-[ ] test suite passes
-[ ] pre-commit passes
+[ ] local test suite passes
+[ ] local pre-commit passes
+[ ] required CI / Lint & Test result for the release commit exists and is successful
 [ ] security implications reviewed
 [ ] release tag points to the intended commit
 ```
@@ -577,7 +652,7 @@ For a release introducing a new wire version:
 [ ] migration documentation present
 ```
 
-## 17. Relationship to public API deprecation
+## 18. Relationship to public API deprecation
 
 Public Python/CLI deprecation is governed by:
 
@@ -599,7 +674,7 @@ emergency exception only for material safety/correctness reasons
 Wire support has the additional requirement that migration must account for
 the persistence of already-created files.
 
-## 18. Current gate assessment
+## 19. Current gate assessment
 
 The existing evidence already freezes:
 
@@ -636,7 +711,7 @@ PRODUCTION_READINESS_GATE_2=PASS
 PRODUCTION_READINESS_GATE_9=PASS
 ```
 
-## 19. Policy gates
+## 20. Policy gates
 
 ```text
 SEMANTIC_VERSION_POLICY_GATE=PASS

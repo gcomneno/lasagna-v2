@@ -793,17 +793,50 @@ Current evidence:
 
 ```text
 .github/workflows/ci.yml
+docs/release-versioning-policy.md
+docs/production-operations.md
 tests/
+tests/test_release_versioning_policy.py
+```
+
+Production-qualified runtime matrix:
+
+```text
+Python 3.12
+Ubuntu 24.04
+```
+
+Package installation metadata remains broader:
+
+```text
+requires-python = ">=3.10"
+```
+
+The packaging range is not interpreted as production qualification.
+
+Release-blocking CI contract:
+
+```text
+required workflow/job = CI / Lint & Test
+required revision     = exact commit intended for release
+required result       = successful completion
+
+failure   -> BLOCK RELEASE
+cancelled -> BLOCK RELEASE
+skipped   -> BLOCK RELEASE
+pending   -> BLOCK RELEASE
+missing   -> BLOCK RELEASE
 ```
 
 Current status:
 
 ```text
-PARTIAL
+PASS
 ```
 
-The repository has active CI and test coverage, but the supported runtime
-matrix and release-blocking policy must be formally frozen.
+The repository has active CI, a frozen production-qualified runtime matrix and
+an explicit release-blocking failure policy. Expanding the production runtime
+matrix requires corresponding CI coverage and policy/test updates.
 
 ## Gate 15 — deterministic behavior
 
@@ -1040,7 +1073,6 @@ The documentation MUST continue to state that scope explicitly.
 Current non-PASS mandatory gates are:
 
 ```text
-regression/CI reliability    PARTIAL
 dependency policy            PARTIAL
 ```
 
@@ -1050,7 +1082,7 @@ Therefore:
 PRODUCTION_READY_GATE=FAIL
 ```
 
-Issue #12 remains blocked by gates 14 and 16.
+Issue #12 remains blocked by gate 16.
 
 ## Existing strong evidence
 
@@ -1175,7 +1207,7 @@ Affected gates require requalification.
 11 API stability                PASS
 12 documentation completeness   PASS
 13 external dataset validation  PASS
-14 regression/CI reliability    PARTIAL
+14 regression/CI reliability    PASS
 15 deterministic behavior       PASS
 16 dependency policy            PARTIAL
 17 supported numeric domain     PASS
@@ -1187,7 +1219,7 @@ Affected gates require requalification.
 Current mandatory PASS count:
 
 ```text
-16
+17
 ```
 
 This count is informational only.
@@ -1248,7 +1280,7 @@ NO
 Reason:
 
 ```text
-mandatory gates 14 and 16 remain PARTIAL
+mandatory gate 16 remains PARTIAL
 ```
 
 ## Meta gates
