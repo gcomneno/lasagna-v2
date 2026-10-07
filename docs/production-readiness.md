@@ -891,14 +891,43 @@ Current evidence:
 
 ```text
 pyproject.toml
+requirements-dev.txt
+docs/dependency-policy.md
+docs/security-review.md
+.github/workflows/ci.yml
+.github/workflows/security.yml
 .github/workflows/supply-chain.yml
+tests/test_dependency_policy.py
+```
+
+Current dependency posture:
+
+```text
+runtime dependencies       none
+build dependency           setuptools>=61.0
+ordinary dev/test tooling  minimum-version constraints
+analysis tooling           minimum-version constraints
+benchmark reproducibility  exact pin where required
+GitHub Actions             full-SHA by default
+mutable Action exceptions  explicitly documented
 ```
 
 Current status:
 
 ```text
-PARTIAL
+PASS
 ```
+
+The project intentionally does not claim a fully hash-locked or hermetic
+development/build environment.
+
+`gorillacompression==1.0.2` is retained as an exact reproducibility-critical
+pin. The current `pypa/gh-action-pip-audit@v1.1.0` reference is explicitly
+classified as the remaining accepted mutable Action exception.
+
+Dependency additions and updates require classification, constraint review,
+security/compatibility review, coherent manifest updates and validation under
+`docs/dependency-policy.md`.
 
 ## Gate 17 — supported numeric domain
 
@@ -1073,7 +1102,7 @@ The documentation MUST continue to state that scope explicitly.
 Current non-PASS mandatory gates are:
 
 ```text
-dependency policy            PARTIAL
+none
 ```
 
 Therefore:
@@ -1082,7 +1111,7 @@ Therefore:
 PRODUCTION_READY_GATE=FAIL
 ```
 
-Issue #12 remains blocked by gate 16.
+No mandatory implementation/policy gate remains non-PASS.
 
 ## Existing strong evidence
 
@@ -1209,7 +1238,7 @@ Affected gates require requalification.
 13 external dataset validation  PASS
 14 regression/CI reliability    PASS
 15 deterministic behavior       PASS
-16 dependency policy            PARTIAL
+16 dependency policy            PASS
 17 supported numeric domain     PASS
 18 operational observability    PASS
 19 access behavior              N/A
@@ -1219,7 +1248,7 @@ Affected gates require requalification.
 Current mandatory PASS count:
 
 ```text
-17
+18
 ```
 
 This count is informational only.
@@ -1280,7 +1309,7 @@ NO
 Reason:
 
 ```text
-mandatory gate 16 remains PARTIAL
+all mandatory gates are PASS; final Issue #12 audit is still required
 ```
 
 ## Meta gates

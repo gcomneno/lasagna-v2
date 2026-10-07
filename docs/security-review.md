@@ -643,8 +643,14 @@ SHA-pinned Actions in most workflow steps
 
 These controls reduce risk but do not substitute for parser review.
 
-Future hardening may pin remaining mutable Action references and adopt stronger
-dependency locking.
+Dependency ownership, constraint conventions, update validation and the
+remaining mutable Action exception are governed by
+`docs/dependency-policy.md`.
+
+The current policy intentionally accepts unlocked transitive build/dev/tooling
+resolution and the documented `pypa/gh-action-pip-audit@v1.1.0` tag reference
+as residual supply-chain risk. Future hardening may tighten either decision,
+but the present qualification does not represent them as hash-locked.
 
 ## Accepted residual risks
 

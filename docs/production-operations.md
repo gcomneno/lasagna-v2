@@ -81,6 +81,27 @@ Historical decoder compatibility is intentionally broader than new encoder
 acceptance. Existing V1 artifacts are still decoded according to the frozen
 legacy semantics; Issue #21 does not redefine historical V1 bytes.
 
+## Dependency and supply-chain policy
+
+The installed Lasagna runtime currently has zero project dependencies.
+
+Build, development, test, benchmark and analysis dependencies are governed
+separately by `docs/dependency-policy.md`.
+
+Current policy intentionally permits minimum-version constraints for ordinary
+build/dev/tooling dependencies and uses exact pins where a dependency is part
+of frozen reproducibility evidence.
+
+`gorillacompression==1.0.2` is the current reproducibility-critical exact pin.
+
+GitHub Actions use immutable full commit SHAs by default. The current
+`pypa/gh-action-pip-audit@v1.1.0` tag reference is the single documented
+mutable-reference exception and is treated as accepted residual supply-chain
+risk, not as an immutable pin.
+
+The project does not currently claim hermetic dependency resolution or
+bit-reproducible package builds.
+
 ## Runtime and CI qualification
 
 The current production-qualified execution matrix is:

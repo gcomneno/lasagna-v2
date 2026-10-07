@@ -12,6 +12,7 @@ def test_operations_guide_covers_required_topics() -> None:
 
     required_headings = (
         "## Supported input and numeric domain",
+        "## Dependency and supply-chain policy",
         "## Runtime and CI qualification",
         "## Lossy semantics",
         "## Error and quality controls",
@@ -78,7 +79,7 @@ def test_readme_points_to_operations_guide_and_has_no_stale_claims() -> None:
     assert "no stability guarantee for future protocol revisions;" not in text
 
 
-def test_final_audit_statuses_after_ci_and_numeric_qualification() -> None:
+def test_all_mandatory_followup_gates_are_pass_before_final_audit() -> None:
     text = READINESS.read_text(encoding="utf-8")
 
     assert re.search(
@@ -88,6 +89,11 @@ def test_final_audit_statuses_after_ci_and_numeric_qualification() -> None:
 
     assert re.search(
         r"(?m)^\s*14\s+regression/CI reliability\s+PASS\s*$",
+        text,
+    )
+
+    assert re.search(
+        r"(?m)^\s*16\s+dependency policy\s+PASS\s*$",
         text,
     )
 
@@ -102,6 +108,6 @@ def test_final_audit_statuses_after_ci_and_numeric_qualification() -> None:
     )
 
     assert re.search(
-        r"Current mandatory PASS count:\s*" r"\n\s*```text\s*\n17\s*\n```",
+        r"Current mandatory PASS count:\s*" r"\n\s*```text\s*\n18\s*\n```",
         text,
     )

@@ -111,4 +111,3 @@ def test_gate_14_is_pass_after_runtime_and_ci_policy_freeze() -> None:
     assert "Python 3.12" in text
     assert "Ubuntu 24.04" in text
     assert "required workflow/job = CI / Lint & Test" in text
-    assert "Current mandatory PASS count:\n\n```text\n17\n```" in text
