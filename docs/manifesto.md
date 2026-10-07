@@ -2,14 +2,26 @@
 
 > **Historical/conceptual note**
 >
-> This document preserves the original conceptual framing that motivated
-> Lasagna 2. The current technical positioning of the project is
-> **Lasagna 2 — Time Series Predictive Codec**.
+> This document preserves the original conceptual framing and MVP-era design
+> narrative that motivated Lasagna 2. It is historical material, not the
+> authoritative specification of the current implementation.
 >
-> “Brain-inspired” is not intended as a neuroscientific claim. The current
-> implementation is an experimental predictive codec for structured
-> univariate time series, centered on segmentation, local prediction,
-> residual quantization, residual coding, and rate–distortion analysis.
+> The current technical positioning is **Lasagna 2 — Time Series Predictive
+> Codec**, production-qualified for the documented univariate whole-file
+> baseline.
+>
+> “Brain-inspired” is not intended as a neuroscientific claim. The historical
+> framing below centers on segmentation, local prediction, residual
+> quantization, residual coding, and rate–distortion analysis. Some implementation
+> details described in the MVP-era body have since evolved.
+>
+> For current behavior and guarantees, use:
+>
+> - `README.md`;
+> - `docs/production-operations.md`;
+> - `docs/production-readiness.md`;
+> - `docs/public-api-contract.md`;
+> - `docs/release-versioning-policy.md`.
 
 ## (Lasagna v2 – Time Series Edition, MVP)
 Non vogliamo solo schiacciare bit. Vogliamo lasciare al dato una forma che una macchina possa ancora capire.
