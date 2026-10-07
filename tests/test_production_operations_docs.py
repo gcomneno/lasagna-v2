@@ -77,7 +77,7 @@ def test_readme_points_to_operations_guide_and_has_no_stale_claims() -> None:
     assert "no stability guarantee for future protocol revisions;" not in text
 
 
-def test_gate_12_is_pass_without_promoting_17_or_18() -> None:
+def test_gate_12_is_pass_with_final_audit_statuses_for_17_and_18() -> None:
     text = READINESS.read_text(encoding="utf-8")
 
     assert re.search(
@@ -86,16 +86,16 @@ def test_gate_12_is_pass_without_promoting_17_or_18() -> None:
     )
 
     assert re.search(
-        r"(?m)^\s*17\s+supported numeric domain\s+PARTIAL\s*$",
+        r"(?m)^\s*17\s+supported numeric domain\s+BLOCKER\s*$",
         text,
     )
 
     assert re.search(
-        r"(?m)^\s*18\s+operational observability\s+PARTIAL\s*$",
+        r"(?m)^\s*18\s+operational observability\s+PASS\s*$",
         text,
     )
 
     assert re.search(
-        r"Current mandatory PASS count:\s*" r"\n\s*```text\s*\n14\s*\n```",
+        r"Current mandatory PASS count:\s*" r"\n\s*```text\s*\n15\s*\n```",
         text,
     )

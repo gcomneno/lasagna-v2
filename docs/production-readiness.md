@@ -651,8 +651,8 @@ old behavior retained through at least one published package release before
 removal, except for explicitly documented security, integrity, data-loss or
 critical-correctness emergencies.
 
-Wire-version lifetime and future wire migration policy remain separate work
-under the release/versioning gate.
+Wire-version lifetime and migration policy are governed by the completed
+release/versioning contract under Gate 9.
 
 ## Gate 12 — documentation completeness
 
@@ -709,8 +709,7 @@ authoritative compatibility/security/resource/performance contracts, and makes
 unsupported or incompletely qualified capabilities explicit.
 
 This documentation gate does not promote other readiness gates. In particular,
-the complete numeric-domain contract and full operational-observability
-qualification retain their independently assessed statuses.
+the supported numeric-domain gate retains its independently assessed status.
 
 ## Gate 13 — external dataset validation
 
@@ -892,13 +891,31 @@ Current evidence:
 
 ```text
 docs/rate-distortion-design.md
+docs/security-review.md
+docs/production-operations.md
 tests/test_core_v2_wire.py
+tests/test_residual_zero_run_codec.py
 ```
 
 Current status:
 
 ```text
-PARTIAL
+BLOCKER
+```
+
+Final-audit finding:
+
+```text
+The encoder does not yet define and enforce a complete numeric-domain contract.
+
+Unsupported non-finite or extreme inputs and out-of-range quantized residuals
+can currently fail through incidental Python/struct behavior.
+
+The varint residual path can silently misrepresent integers outside the
+signed-int32 domain.
+
+Documentation alone is therefore insufficient: focused implementation
+hardening, boundary tests and an explicit numeric-domain contract are required.
 ```
 
 ## Gate 18 — operational observability
@@ -925,14 +942,34 @@ safe file-info command
 Current evidence:
 
 ```text
-CLI info/inspection functionality
+docs/public-api-contract.md
+docs/production-operations.md
+docs/resource-limits.md
+docs/security-review.md
+lasagna2/cli.py
 tests/test_cli_encode_decode_info.py
+tests/test_cli_v2_acceptance.py
+tests/test_resource_limits.py
+tests/test_decode_malicious.py
 ```
 
 Current status:
 
 ```text
-PARTIAL
+PASS
+```
+
+Final-audit finding:
+
+```text
+The public exception contract, bounded inspection path, wire-version reporting,
+metadata output, diagnostic CLI commands, resource-limit behavior and associated
+tests already satisfy this gate.
+
+The previous PARTIAL state was stale.
+
+The info command remains an inspection tool rather than an integrity,
+authenticity or full-decodability guarantee.
 ```
 
 ## Gate 19 — access behavior
@@ -989,24 +1026,12 @@ The documentation MUST continue to state that scope explicitly.
 
 ## Mandatory blocker summary
 
-Current known non-PASS mandatory gates include:
+Current non-PASS mandatory gates are:
 
 ```text
-format stability             PASS
-compatibility policy         PASS
-malformed-input handling     PASS
-fuzzing                      PASS
-corruption behavior          PASS
-large-file behavior          PASS
-release/versioning policy    PASS
-security review              PASS
-API stability                PASS
-documentation completeness   PASS
-external dataset validation  PARTIAL
-CI/runtime support policy    PARTIAL
+regression/CI reliability    PARTIAL
 dependency policy            PARTIAL
-supported numeric domain     PARTIAL
-operational observability    PARTIAL
+supported numeric domain     BLOCKER
 ```
 
 Therefore:
@@ -1015,9 +1040,7 @@ Therefore:
 PRODUCTION_READY_GATE=FAIL
 ```
 
-This is expected.
-
-Issue #12 exists to make that state explicit.
+Issue #12 remains blocked by gates 14, 16 and 17.
 
 ## Existing strong evidence
 
@@ -1057,8 +1080,21 @@ G. expanded external dataset qualification
 H. production documentation completion
 ```
 
-Additional subordinate issues MAY be split further if implementation scope
-requires it.
+Completion status:
+
+```text
+A. COMPLETE (#13)
+B. COMPLETE (#14)
+C. COMPLETE (#15)
+D. COMPLETE (#16)
+E. COMPLETE (#17)
+F. COMPLETE (#18)
+G. COMPLETE (#19)
+H. COMPLETE (#20)
+```
+
+The final audit identified additional mandatory closure work for gates 14, 16
+and 17. These are distinct from the original A-H subordinate-work list.
 
 ## Closure policy for issue #12
 
@@ -1132,8 +1168,8 @@ Affected gates require requalification.
 14 regression/CI reliability    PARTIAL
 15 deterministic behavior       PASS
 16 dependency policy            PARTIAL
-17 supported numeric domain     PARTIAL
-18 operational observability    PARTIAL
+17 supported numeric domain     BLOCKER
+18 operational observability    PASS
 19 access behavior              N/A
 20 multivariate behavior        N/A
 ```
@@ -1141,7 +1177,7 @@ Affected gates require requalification.
 Current mandatory PASS count:
 
 ```text
-14
+15
 ```
 
 This count is informational only.
@@ -1202,7 +1238,8 @@ NO
 Reason:
 
 ```text
-tracking/meta issue remains open until subordinate production work completes
+mandatory gates 14 and 16 remain PARTIAL;
+mandatory gate 17 is BLOCKER
 ```
 
 ## Meta gates
