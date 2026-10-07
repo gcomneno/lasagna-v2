@@ -1,4 +1,4 @@
-# Lasagna 2 — v0.3.0
+# Lasagna 2 — v0.3.0 (2026-10-07)
 
 This release makes the frozen V2 wire format the default encoding path while
 retaining explicit V1 encoding and full V1/V2 decode compatibility.
@@ -58,12 +58,30 @@ Callers requiring byte-compatible V1 output must use
 Package version `0.3.0` and wire-format version `2` are separate version
 domains. Existing V1 files remain supported by the decoder.
 
+## Wire compatibility declaration
+
+```text
+DECODE:
+    V1, V2
+
+ENCODE DEFAULT:
+    V2
+
+ENCODE EXPLICIT:
+    V1, V2
+
+DEPRECATED:
+    none
+```
+
 The V2 default transition follows the frozen-layout validation completed in
 v0.2.2 and the subsequent independent road test confirming deterministic V2
 encoding, V1/V2 decode compatibility, and materially smaller V2 output without
 a meaningful reconstruction-quality change.
 
-The project remains experimental research software.
+Lasagna 2 is production-qualified for the documented univariate whole-file
+baseline. The qualification does not claim universal codec superiority or
+support outside the documented operational boundaries.
 
 ---
 

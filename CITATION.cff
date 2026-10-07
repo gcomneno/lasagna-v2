@@ -5,9 +5,9 @@ type: software
 authors:
   - given-names: Giancarlo
     family-names: "Cicellyn Comneno"
-version: 0.2.2
-doi: 10.5281/zenodo.23119692
-date-released: 2026-10-03
+version: 0.3.0
+doi: 10.5281/zenodo.23119691
+date-released: 2026-10-07
 license: MIT
 repository-code: "https://github.com/gcomneno/lasagna-v2"
-url: "https://doi.org/10.5281/zenodo.23119692"
+url: "https://doi.org/10.5281/zenodo.23119691"
