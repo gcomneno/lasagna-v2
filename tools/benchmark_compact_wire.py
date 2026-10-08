@@ -29,17 +29,17 @@ for directory in (ROOT, ROOT / "tools"):
     if str(directory) not in sys.path:
         sys.path.insert(0, str(directory))
 
-import analyze_segment_byte_anatomy as projection25
-import benchmark_local_model_value as frozen24
-from benchmark_codec import (
+import analyze_segment_byte_anatomy as projection25  # noqa: E402
+import benchmark_local_model_value as frozen24  # noqa: E402
+from benchmark_codec import (  # noqa: E402
     _measure_deterministic_encode,
     _median_call_ms,
     canonical_float64_bytes,
     load_csv_values,
 )
 
-from lasagna2 import core
-from lasagna2 import experimental_compact as compact
+from lasagna2 import core  # noqa: E402
+from lasagna2 import experimental_compact as compact  # noqa: E402
 
 INTERNAL_DATASETS = frozen24.INTERNAL_DATASETS
 EXTERNAL_DATASETS = frozen24.EXTERNAL_DATASETS
