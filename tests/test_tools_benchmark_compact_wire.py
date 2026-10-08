@@ -435,9 +435,111 @@ def test_deterministic_timed_bytes_must_match_untimed_evidence(monkeypatch):
     assert "differs from untimed evidence" in evidence["compact_timing_error"]
 
 
-@pytest.fixture(scope="module")
-def provenance():
-    # Read-only identity capture; no corpus load, encoding, or measurement.
+@pytest.fixture
+def provenance_inputs(tmp_path, monkeypatch):
+    """Synthetic identities and metadata; no laboratory files or Git history."""
+    root = tmp_path / "inputs"
+    paths = {p.relative_to(ROOT) for p in harness.protected_paths()}
+    paths.add(Path("lasagna2/experimental_compact.py"))
+    for relative in paths:
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(f"synthetic identity: {relative}\n")
+    for _, relative in harness.corpus_order():
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"value\n1\n2\n1.5\n3\n")
+    (root / "pyproject.toml").write_text(
+        '[project]\nname = "synthetic"\nversion = "0.0.0"\n'
+    )
+
+    monkeypatch.setattr(harness, "ROOT", root)
+    monkeypatch.setattr(harness.frozen24, "ROOT", root)
+    for module, name, relative in (
+        (harness, "PROTOCOL_PATH", "docs/compact-wire-layout-protocol.md"),
+        (harness, "PROJECTION_PROTOCOL_PATH", "docs/segment-byte-anatomy-protocol.md"),
+        (harness.frozen24, "PROTOCOL_PATH", "docs/local-model-value-protocol.md"),
+        (harness.core, "__file__", "lasagna2/core.py"),
+        (harness.compact, "__file__", "lasagna2/experimental_compact.py"),
+        (harness.projection25, "__file__", "tools/analyze_segment_byte_anatomy.py"),
+    ):
+        path = root / relative
+        monkeypatch.setattr(module, name, str(path) if name == "__file__" else path)
+    # #24 hashes corpus paths relative to the working directory.
+    monkeypatch.chdir(root)
+
+    baseline = [
+        {
+            **{
+                k: point[k]
+                for k in (
+                    "point_id",
+                    "dataset",
+                    "evidence_group",
+                    "architecture",
+                    "C_Q",
+                )
+            },
+            "architecture_name": harness.frozen24.architecture_by_id(
+                point["architecture"]
+            ).name,
+            "n_samples": 4,
+            "segment_count": 1,
+            "mean_predictor_segments": 0,
+            "linear_predictor_segments": 1,
+            "rw_predictor_segments": 0,
+            "global_and_context_bytes": 79,
+            "structural_bytes": 123,
+            "residual_payload_bytes": 77,
+            "encoded_bytes": 200,
+        }
+        for point in harness.execution_order()
+    ]
+    projected = [harness.projection25._project_row(row) for row in baseline]
+    for rows, relative in (
+        (baseline, "docs/local-model-value-results.csv"),
+        (projected, "docs/segment-byte-anatomy-results.csv"),
+    ):
+        harness.frozen24.write_csv(rows, root / relative, tuple(rows[0]))
+    harness.frozen24.write_json(
+        {
+            "codec_source_identity": {
+                "sha256": harness.frozen24.sha256_file(Path(harness.core.__file__))
+            },
+            "dataset_sha256": {
+                str(p): harness.frozen24.sha256_file(root / p)
+                for _, p in harness.corpus_order()
+            },
+        },
+        root / "docs/local-model-value-provenance.json",
+    )
+    committed = {
+        p.relative_to(root).as_posix(): harness.frozen24.sha256_file(p)
+        for p in harness.protected_paths()
+    }
+
+    def git_output(*args):
+        if args[0] == "hash-object":
+            return harness.frozen24.sha256_file(Path(args[-1]))
+        if args[:2] == ("rev-parse", "HEAD"):
+            return "synthetic-head"
+        if args[0] == "rev-parse":
+            return committed[args[1].removeprefix("HEAD:")]
+        assert args[0] == "status"
+        return ""
+
+    monkeypatch.setattr(harness.frozen24, "git_output", git_output)
+    monkeypatch.setattr(
+        harness.frozen24,
+        "verify_protocol_freeze",
+        lambda: harness.frozen24.PROTOCOL_FREEZE_COMMIT,
+    )
+    return root
+
+
+@pytest.fixture
+def provenance(provenance_inputs):
+    # Real capture and validation, with no corpus load, encoding, or measurement.
     return harness.capture_provenance(
         [sys.executable, "tools/benchmark_compact_wire.py", "--mode", "corpus"]
     )
@@ -452,9 +554,9 @@ def test_provenance_contains_frozen_and_prototype_identities(provenance):
     )
     assert provenance["compact_prototype_identity"][
         "sha256"
-    ] == harness.frozen24.sha256_file(ROOT / "lasagna2/experimental_compact.py")
+    ] == harness.frozen24.sha256_file(Path(harness.compact.__file__))
     assert provenance["v2_encoder_source_sha256"] == harness.frozen24.sha256_file(
-        ROOT / "lasagna2/core.py"
+        Path(harness.core.__file__)
     )
     assert provenance["baseline24_artifact_sha256"]
     assert (
@@ -463,6 +565,58 @@ def test_provenance_contains_frozen_and_prototype_identities(provenance):
     )
     assert "material_win_max" not in provenance["frozen_controls"]
     assert provenance["execution_order"] == harness.execution_order()
+
+
+@pytest.mark.parametrize(
+    "relative,error",
+    (
+        (
+            "data/external-qualification/canonical/appliances-energy.csv",
+            "Corpus bytes differ",
+        ),
+        ("lasagna2/core.py", "Frozen identity changed"),
+    ),
+)
+@pytest.mark.parametrize("missing", (False, True))
+def test_capture_rejects_changed_or_missing_inputs(
+    provenance_inputs, relative, error, missing
+):
+    path = provenance_inputs / relative
+    if missing:
+        path.unlink()
+    else:
+        path.write_bytes(path.read_bytes() + b"corruption")
+    with pytest.raises(
+        FileNotFoundError if missing else ValueError, match=None if missing else error
+    ):
+        harness.capture_provenance(["synthetic-capture"])
+
+
+@pytest.mark.parametrize(
+    "relative,error",
+    (
+        (
+            "data/external-qualification/canonical/appliances-energy.csv",
+            "Dataset identity mismatch",
+        ),
+        ("docs/local-model-value-matched.csv", "Provenance identity mismatch"),
+        ("lasagna2/experimental_compact.py", "Compact prototype identity mismatch"),
+    ),
+)
+@pytest.mark.parametrize("missing", (False, True))
+def test_validation_rejects_changed_or_missing_inputs(
+    provenance, relative, error, missing
+):
+    path = harness.ROOT / relative
+    if missing:
+        path.unlink()
+        error = "No such file|Incomplete protected provenance identities"
+    else:
+        path.write_bytes(path.read_bytes() + b"corruption")
+    with pytest.raises(
+        (FileNotFoundError, ValueError) if missing else ValueError, match=error
+    ):
+        harness.validate_provenance(provenance)
 
 
 @pytest.mark.parametrize(
@@ -613,11 +767,13 @@ def test_runner_visits_exact_grid_using_only_synthetic_evaluations(
     monkeypatch.setattr(harness, "public_compatibility", lambda: _canonical_public())
     baseline = {
         r["point_id"]: r
-        for r in harness.read_csv(ROOT / "docs/local-model-value-results.csv")
+        for r in harness.read_csv(harness.ROOT / "docs/local-model-value-results.csv")
     }
     projected = {
         r["point_id"]: r
-        for r in harness.read_csv(ROOT / "docs/segment-byte-anatomy-results.csv")
+        for r in harness.read_csv(
+            harness.ROOT / "docs/segment-byte-anatomy-results.csv"
+        )
     }
     visited, writes = [], []
     csv_writer = harness.frozen24.write_csv
@@ -894,7 +1050,7 @@ def test_import_never_executes_measurement(monkeypatch):
 
 
 @pytest.fixture
-def saved_reporting_evidence(tmp_path):
+def saved_reporting_evidence(tmp_path, provenance):
     """Persist typed metadata only; never evaluate or encode a dataset point."""
     rows, evidence = _synthetic_grid()
     for row in rows:
@@ -943,8 +1099,7 @@ def saved_reporting_evidence(tmp_path):
     harness.frozen24.write_csv(
         harness.summarize(rows), artifacts.summary, harness.SUMMARY_FIELDS
     )
-    artifacts.provenance.write_bytes(harness.Artifacts().provenance.read_bytes())
-    provenance = json.loads(artifacts.provenance.read_text())
+    harness.frozen24.write_json(provenance, artifacts.provenance)
     return artifacts, rows, evidence, provenance
 
 
