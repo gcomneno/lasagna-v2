@@ -273,13 +273,15 @@ The compact representation is considered structurally promising only if all of
 the following hold:
 
 ```text
-1. median per-segment fixed-overhead reduction >= 50%
+1. median row-level per-segment fixed-overhead reduction
+   across the complete frozen #24 matrix >= 50%
 
-2. median projected total encoded-byte reduction
+2. median row-level projected total encoded-byte reduction
    on external A4 rows >= 15%
 
-3. projected structural fraction on external A4
-   decreases materially relative to the frozen baseline
+3. median row-level structural-fraction decrease
+   on external A4 rows >= 0.10 absolute
+   (ten percentage points)
 
 4. no result requires changing distortion or residual payload
 
@@ -287,7 +289,28 @@ the following hold:
    not only by empirical correlation
 ```
 
-These thresholds are frozen before execution.
+For criterion 1, each row contributes:
+
+```text
+1 - projected_segment_bytes / (44 * segment_count)
+```
+
+For criterion 2, each external A4 row contributes:
+
+```text
+1 - projected_encoded_bytes / current_encoded_bytes
+```
+
+For criterion 3, each external A4 row contributes:
+
+```text
+current_structural_fraction - projected_structural_fraction
+```
+
+Medians are ordinary medians over the corresponding frozen row population.
+No dataset weighting or post-result exclusion is permitted.
+
+These thresholds and aggregation rules are frozen before execution.
 
 ## Outcome classes
 
