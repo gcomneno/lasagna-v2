@@ -1,4 +1,18 @@
 # Contributing to Lasagna v2
+
+## Current contribution scope
+
+Lasagna 2 is maintaining and consolidating the current 0.3.0 baseline.
+Contributions should focus on bug fixes, security, compatibility and
+documentation within the existing public scope. New features and further
+codec experiments are suspended; the proposal and pull-request guidance
+below applies within this maintenance scope.
+
+Experiment #26's compact wire implementation remains experimental and outside
+the supported public V1/V2 format contract. Preserve the scientific evidence
+from experiments #24–#26. Maintenance work must follow the existing public API,
+wire compatibility and release policies.
+
 Thanks for your interest in **Lasagna v2** – a security‑first, time‑series–oriented compressor.
 This document explains how to set up your environment, run tests, and send good‑quality contributions.
 
