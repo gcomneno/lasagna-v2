@@ -1,5 +1,18 @@
 # Lasagna 2 — Time Series Predictive Codec
 
+## Maintenance phase
+
+Lasagna 2 is in a maintenance and consolidation phase for the current 0.3.0
+baseline. New features and further codec experiments are suspended. Current
+work focuses on bug fixes, security, compatibility and documentation within
+the documented production-qualified scope.
+
+The public codec supports V1 and V2, with V2 as the default encoder.
+The compact wire implementation from experiment #26 remains experimental;
+it is not a supported public format or a production-qualified successor to V2.
+The evidence from experiments #24–#26 is retained as research history.
+
+
 [![CI](https://github.com/gcomneno/lasagna-v2/actions/workflows/ci.yml/badge.svg)](https://github.com/gcomneno/lasagna-v2/actions/workflows/ci.yml)
 [![Security](https://github.com/gcomneno/lasagna-v2/actions/workflows/security.yml/badge.svg)](https://github.com/gcomneno/lasagna-v2/actions/workflows/security.yml)
 [![Supply chain](https://github.com/gcomneno/lasagna-v2/actions/workflows/supply-chain.yml/badge.svg)](https://github.com/gcomneno/lasagna-v2/actions/workflows/supply-chain.yml)
